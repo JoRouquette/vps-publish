@@ -1,0 +1,37 @@
+{
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "node apps/obsidian-vps-publish/scripts/update-obsidian-version.mjs ${nextRelease.version}"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "CHANGELOG.md",
+          "package.json",
+          "apps/obsidian-vps-publish/manifest.json",
+          "apps/obsidian-vps-publish/versions.json",
+          "dist/obsidian-vps-publish/**"
+        ],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "dist/obsidian-vps-publish",
+            "label": "Obsidian plugin folder"
+          }
+        ]
+      }
+    ]
+  ]
+}
