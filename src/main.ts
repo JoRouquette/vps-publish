@@ -186,13 +186,23 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     const parseContentHandler = this.buildParseContentHandler(settings, scopedLogger);
     let publishables = await parseContentHandler.handle(notes);
 
+    const publishableCount = publishables.length;
     const notesWithAssets = publishables.filter((n) => n.assets && n.assets.length > 0);
     const assetsPlanned = notesWithAssets.reduce(
       (sum, n) => sum + (Array.isArray(n.assets) ? n.assets.length : 0),
       0
     );
 
-    scopedLogger.info('Total notes collected and parsed', { count: notes.length });
+    scopedLogger.info('Total notes collected and parsed', {
+      collected: notes.length,
+      publishable: publishableCount,
+    });
+
+    if (publishableCount === 0) {
+      this.logger.warn('No publishable notes after filtering; aborting upload.');
+      new Notice('No publishable notes to upload.');
+      return;
+    }
 
     const sessionClient = new SessionApiClient(
       vps.url,
@@ -205,14 +215,14 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     const maxBytesRequested = 5 * 1024 * 1024;
     let maxBytesPerRequest = maxBytesRequested;
     let assetsUploaded = 0;
-    const totalPlanned = notes.length + assetsPlanned;
+    const totalPlanned = publishableCount + assetsPlanned;
     const progress =
       totalPlanned > 0 ? new NoticeProgressAdapter('Publishing to VPS') : null;
     let progressStarted = false;
 
     try {
       const started = await sessionClient.startSession({
-        notesPlanned: notes.length,
+        notesPlanned: publishableCount,
         assetsPlanned: assetsPlanned,
         maxBytesPerRequest: maxBytesRequested,
       });
@@ -258,7 +268,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
       }
 
       await sessionClient.finishSession(sessionId, {
-        notesProcessed: notes.length,
+        notesProcessed: publishableCount,
         assetsProcessed: assetsUploaded,
       });
 
@@ -266,7 +276,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
         progress?.finish();
       }
 
-      const successMsg = `Published ${notes.length} note(s)${
+      const successMsg = `Published ${publishableCount} note(s)${
         assetsPlanned ? ` and ${assetsUploaded} asset(s)` : ''
       }.`;
       new Notice(successMsg);
