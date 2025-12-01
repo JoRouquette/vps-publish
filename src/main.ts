@@ -20,6 +20,7 @@ import { ConsoleLoggerAdapter } from './lib/infra/console-logger.adapter';
 import { GuidGeneratorAdapter } from './lib/infra/guid-generator.adapter';
 import { NotesUploaderAdapter } from './lib/infra/notes-uploader.adapter';
 import { ObsidianAssetsVaultAdapter } from './lib/infra/obsidian-assets-vault.adapter';
+import { NoticeProgressAdapter } from './lib/infra/notice-progress.adapter';
 import { ObsidianVaultAdapter } from './lib/infra/obsidian-vault.adapter';
 import { testVpsConnection } from './lib/services/http-connection.service';
 import { SessionApiClient } from './lib/services/session-api.client';
@@ -169,7 +170,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     }
     if (!settings.folders || settings.folders.length === 0) {
       this.logger.warn('No folders configured');
-      new Notice('?? No folders configured for publishing.');
+      new Notice('No folders configured for publishing.');
       return;
     }
 
@@ -204,6 +205,10 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     const maxBytesRequested = 5 * 1024 * 1024;
     let maxBytesPerRequest = maxBytesRequested;
     let assetsUploaded = 0;
+    const totalPlanned = notes.length + assetsPlanned;
+    const progress =
+      totalPlanned > 0 ? new NoticeProgressAdapter('Publishing to VPS') : null;
+    let progressStarted = false;
 
     try {
       const started = await sessionClient.startSession({
@@ -216,11 +221,17 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
       maxBytesPerRequest = started.maxBytesPerRequest;
       this.logger.info('Session started', { sessionId, maxBytesPerRequest });
 
+      if (progress && !progressStarted) {
+        progress.start(totalPlanned);
+        progressStarted = true;
+      }
+
       const notesUploader = new NotesUploaderAdapter(
         sessionClient,
         sessionId,
         this.logger,
-        maxBytesPerRequest
+        maxBytesPerRequest,
+        progress ?? undefined
       );
       await notesUploader.upload(publishables);
 
@@ -230,7 +241,8 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
           sessionClient,
           sessionId,
           this.logger,
-          maxBytesPerRequest
+          maxBytesPerRequest,
+          progress ?? undefined
         );
 
         const resolvedAssets = await assetsVault.resolveAssetsFromNotes(
@@ -250,14 +262,14 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
         assetsProcessed: assetsUploaded,
       });
 
-      new Notice(
-        '' +
-          ('Published ' +
-            notes.length +
-            ' note(s)' +
-            (assetsPlanned ? ' and ' + assetsUploaded + ' asset(s)' : '') +
-            '.')
-      );
+      if (progressStarted) {
+        progress?.finish();
+      }
+
+      const successMsg = `Published ${notes.length} note(s)${
+        assetsPlanned ? ` and ${assetsUploaded} asset(s)` : ''
+      }.`;
+      new Notice(successMsg);
     } catch (err) {
       this.logger.error('Publishing failed, aborting session if created', err);
       if (sessionId) {
@@ -267,7 +279,10 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
           this.logger.error('Failed to abort session', abortErr);
         }
       }
-      new Notice('❌ Publishing failed (see console).');
+      if (progressStarted) {
+        progress?.finish();
+      }
+      new Notice('Publishing failed (see console).');
     }
   }
 
