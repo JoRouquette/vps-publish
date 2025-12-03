@@ -8,6 +8,7 @@ import { renderVaultSection } from './settings/sections/vault-section';
 import { renderFoldersSection } from './settings/sections/folders-section';
 import { renderIgnoreRulesSection } from './settings/sections/ignore-rules-section';
 import { renderVpsSection } from './settings/sections/vps-section';
+import { renderAdvancedSection } from './settings/sections/advanced-section';
 
 export class ObsidianVpsPublishSettingTab extends PluginSettingTab {
   private readonly plugin: ObsidianVpsPublishPlugin;
@@ -39,5 +40,6 @@ export class ObsidianVpsPublishSettingTab extends PluginSettingTab {
     renderFoldersSection(root, ctx);
     renderIgnoreRulesSection(root, ctx);
     renderVpsSection(root, ctx);
+    renderAdvancedSection(root, ctx);
   }
 }
