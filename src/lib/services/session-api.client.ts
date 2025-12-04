@@ -47,11 +47,13 @@ export class SessionApiClient {
     notesPlanned: number;
     assetsPlanned: number;
     maxBytesPerRequest: number;
+    calloutStyles?: { path: string; css: string }[];
   }): Promise<StartSessionResponse> {
     const result = await this.postJson('/api/session/start', {
       notesPlanned: payload.notesPlanned,
       assetsPlanned: payload.assetsPlanned,
       batchConfig: { maxBytesPerRequest: payload.maxBytesPerRequest },
+      calloutStyles: payload.calloutStyles ?? [],
     });
 
     if (result.isError) throw result.error ?? new Error('startSession failed');

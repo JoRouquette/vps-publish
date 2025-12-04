@@ -6,15 +6,16 @@ type TagSuggestion = { tag: string; count: number };
  * Suggester de tags du vault (via metadataCache.getTags()).
  */
 export class TagSuggester extends AbstractInputSuggest<TagSuggestion> {
-  constructor(app: App, private readonly inputEl: HTMLInputElement) {
+  constructor(
+    app: App,
+    private readonly inputEl: HTMLInputElement
+  ) {
     super(app, inputEl);
   }
 
   getSuggestions(query: string): TagSuggestion[] {
     const normalized = (query || '').toLowerCase();
-    const tags =
-      ((this.app.metadataCache as any).getTags?.() as Record<string, unknown>) ??
-      {};
+    const tags = ((this.app.metadataCache as any).getTags?.() as Record<string, unknown>) ?? {};
 
     return Object.entries(tags)
       .map(([tag, count]) => ({

@@ -6,7 +6,10 @@ type FrontmatterPropertySuggestion = { key: string; count: number };
  * Suggester de propriétés de frontmatter présentes dans le vault.
  */
 export class FrontmatterPropertySuggester extends AbstractInputSuggest<FrontmatterPropertySuggestion> {
-  constructor(app: App, private readonly inputEl: HTMLInputElement) {
+  constructor(
+    app: App,
+    private readonly inputEl: HTMLInputElement
+  ) {
     super(app, inputEl);
   }
 

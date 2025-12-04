@@ -27,6 +27,7 @@ import { SessionApiClient } from './lib/services/session-api.client';
 import { ObsidianVpsPublishSettingTab } from './lib/setting-tab.view';
 import type { PluginSettings } from './lib/settings/plugin-settings.type';
 import { RequestUrlResponseMapper } from './lib/utils/http-response-status.mapper';
+import { DEFAULT_LOGGER_LEVEL } from './lib/constants/default-logger-level.constant';
 
 const defaultSettings: PluginSettings = {
   vpsConfigs: [],
@@ -37,6 +38,8 @@ const defaultSettings: PluginSettings = {
   enableAssetsVaultFallback: true,
   frontmatterKeysToExclude: [],
   frontmatterTagsToExclude: [],
+  logLevel: DEFAULT_LOGGER_LEVEL,
+  calloutStylePaths: [],
 };
 
 // -----------------------------------------------------------------------------
@@ -82,6 +85,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     await this.loadSettings();
     const { t } = getTranslations(this.app, this.settings);
 
+    this.logger.level = this.settings.logLevel ?? DEFAULT_LOGGER_LEVEL;
     this.logger.debug('Plugin loading...');
 
     this.responseHandler = new HttpResponseHandler<RequestUrlResponse>(
@@ -210,14 +214,14 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
       this.responseHandler,
       this.logger
     );
+    const calloutStyles = await this.loadCalloutStyles(settings.calloutStylePaths ?? []);
 
     let sessionId = null;
     const maxBytesRequested = 5 * 1024 * 1024;
     let maxBytesPerRequest = maxBytesRequested;
     let assetsUploaded = 0;
     const totalPlanned = publishableCount + assetsPlanned;
-    const progress =
-      totalPlanned > 0 ? new NoticeProgressAdapter('Publishing to VPS') : null;
+    const progress = totalPlanned > 0 ? new NoticeProgressAdapter('Publishing to VPS') : null;
     let progressStarted = false;
 
     try {
@@ -225,6 +229,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
         notesPlanned: publishableCount,
         assetsPlanned: assetsPlanned,
         maxBytesPerRequest: maxBytesRequested,
+        calloutStyles,
       });
 
       sessionId = started.sessionId;
@@ -294,6 +299,34 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
       }
       new Notice('Publishing failed (see console).');
     }
+  }
+
+  private async loadCalloutStyles(paths: string[]): Promise<Array<{ path: string; css: string }>> {
+    const styles: Array<{ path: string; css: string }> = [];
+    const adapter: any = this.app.vault.adapter;
+
+    for (const raw of paths ?? []) {
+      const path = raw.trim();
+      if (!path) continue;
+
+      try {
+        const exists = await adapter.exists(path);
+        if (!exists) {
+          this.logger.warn('Callout style path not found', { path });
+          continue;
+        }
+        const css = await adapter.read(path);
+        styles.push({ path, css });
+      } catch (err) {
+        this.logger.error('Failed to read callout style', { path, err });
+      }
+    }
+
+    if (styles.length) {
+      this.logger.info('Loaded callout styles', { count: styles.length });
+    }
+
+    return styles;
   }
 
   // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ const makeLogger = () =>
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
-  } as any);
+  }) as any;
 
 describe('NotesUploaderAdapter', () => {
   const sessionClient = { uploadNotes: jest.fn() } as any;

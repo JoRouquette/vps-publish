@@ -5,7 +5,10 @@ import { AbstractInputSuggest, TFolder, App } from 'obsidian';
  * Attachée à un <input> existant, sans modal séparée.
  */
 export class FolderSuggest extends AbstractInputSuggest<TFolder> {
-  constructor(app: App, private inputEl: HTMLInputElement) {
+  constructor(
+    app: App,
+    private inputEl: HTMLInputElement
+  ) {
     super(app, inputEl);
   }
 

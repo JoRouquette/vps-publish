@@ -6,8 +6,7 @@ export type I18nSettings = {
 };
 
 export function detectSystemLocale(app: App): Locale {
-  const lang =
-    (navigator as any).language || (navigator as any).userLanguage || 'en';
+  const lang = (navigator as any).language || (navigator as any).userLanguage || 'en';
 
   const lower = String(lang).toLowerCase();
   if (lower.startsWith('fr')) return 'fr';

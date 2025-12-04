@@ -7,7 +7,7 @@ const mockLogger = () =>
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
-  } as any);
+  }) as any;
 
 const responseOk = (text: string) => ({
   isError: false,
@@ -26,12 +26,20 @@ describe('SessionApiClient', () => {
       headers: {},
       text: JSON.stringify({ sessionId: 's1', maxBytesPerRequest: '1mb' }),
     });
-    const handler = { handleResponseAsync: jest.fn().mockResolvedValue(responseOk('{"sessionId":"s1","maxBytesPerRequest":"1mb"}')) };
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValue(responseOk('{"sessionId":"s1","maxBytesPerRequest":"1mb"}')),
+    };
     jest.doMock('obsidian', () => ({ requestUrl }));
 
     const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
     const client = new Client('http://api', 'k', handler as any, mockLogger());
-    const res = await client.startSession({ notesPlanned: 1, assetsPlanned: 0, maxBytesPerRequest: 1024 });
+    const res = await client.startSession({
+      notesPlanned: 1,
+      assetsPlanned: 0,
+      maxBytesPerRequest: 1024,
+    });
 
     expect(res.sessionId).toBe('s1');
     // Selon la réponse, parseLimit renvoie la valeur ou le fallback (8MB)

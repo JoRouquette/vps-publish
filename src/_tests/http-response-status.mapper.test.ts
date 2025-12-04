@@ -29,15 +29,13 @@ describe('RequestUrlResponseMapper', () => {
 
   it('retourne "Unknown Status" pour un code non listé', () => {
     const mapper = new RequestUrlResponseMapper(new NoopLogger() as any);
-    const res = mapper.execute(
-      {
-        status: 499,
-        headers: {} as any,
-        text: 'oops',
-        arrayBuffer: async () => new ArrayBuffer(0),
-        json: async () => ({}),
-      } as any
-    );
+    const res = mapper.execute({
+      status: 499,
+      headers: {} as any,
+      text: 'oops',
+      arrayBuffer: async () => new ArrayBuffer(0),
+      json: async () => ({}),
+    } as any);
 
     expect(res.response.statusText).toBe('Unknown Status');
   });

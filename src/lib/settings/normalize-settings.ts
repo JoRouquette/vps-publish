@@ -1,6 +1,7 @@
 import type { PluginSettings } from './plugin-settings.type';
 import type { LoggerPort } from '@core-domain/ports/logger-port';
 import type { VpsConfig } from '@core-domain/entities/vps-config';
+import { DEFAULT_LOGGER_LEVEL } from '../constants/default-logger-level.constant';
 
 export function normalizeSettings(settings: PluginSettings, logger?: LoggerPort): void {
   if (!Array.isArray(settings.vpsConfigs)) {
@@ -41,6 +42,15 @@ export function normalizeSettings(settings: PluginSettings, logger?: LoggerPort)
   if (settings.enableAssetsVaultFallback == null) {
     logger?.info('enableAssetsVaultFallback not set, defaulting to true.');
     settings.enableAssetsVaultFallback = true;
+  }
+
+  if (!Array.isArray(settings.calloutStylePaths)) {
+    logger?.info('calloutStylePaths not set, defaulting to empty array.');
+    settings.calloutStylePaths = [];
+  }
+
+  if (settings.logLevel == null) {
+    settings.logLevel = DEFAULT_LOGGER_LEVEL;
   }
 
   const availableVpsIds = new Set(settings.vpsConfigs.map((v) => v.id));

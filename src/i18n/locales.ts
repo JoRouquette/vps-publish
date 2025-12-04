@@ -108,6 +108,19 @@ export type VaultTranslations = {
   enableAssetsVaultFallbackDescription: string;
 };
 
+export type AdvancedTranslations = {
+  title: string;
+  logLevelLabel: string;
+  logLevelDescription: string;
+  logLevelDebug: string;
+  logLevelInfo: string;
+  logLevelWarn: string;
+  logLevelError: string;
+  calloutStylesLabel: string;
+  calloutStylesDescription: string;
+  calloutStylesPlaceholder: string;
+};
+
 export type SettingsTranslations = {
   tabTitle: string;
   errors: {
@@ -122,6 +135,7 @@ export type SettingsTranslations = {
   ignoreRules: IgnoreRulesTranslations;
   testConnection: TestConnectionTranslations;
   vault: VaultTranslations;
+  advanced: AdvancedTranslations;
 };
 
 export type Translations = {
@@ -238,6 +252,19 @@ export const en: Translations = {
       enableAssetsVaultFallbackDescription:
         'If enabled, when an asset is not found in the specified folder, the system will look for it in the vault root and in all folders.',
     },
+    advanced: {
+      title: 'Advanced settings',
+      logLevelLabel: 'Log level',
+      logLevelDescription: 'From debug (verbose) to warning (default). Applied immediately.',
+      logLevelDebug: 'Debug (verbose)',
+      logLevelInfo: 'Info',
+      logLevelWarn: 'Warning (default)',
+      logLevelError: 'Error only',
+      calloutStylesLabel: 'Callout styles (CSS paths)',
+      calloutStylesDescription:
+        'Paths (one per line or comma separated) to CSS files in the vault. They will be uploaded, parsed and used to extend callout definitions on the server.',
+      calloutStylesPlaceholder: '.obsidian/snippets/callouts.css',
+    },
   },
 };
 
@@ -246,12 +273,12 @@ export const fr: Translations = {
     name: 'Publier vers mon VPS personnel',
     commandPublish: 'Publier vers mon VPS personnel',
     commandTestConnection: 'Tester la connexion VPS',
-    commandOpenSettings: 'Ouvrir les paramètres du plugin Publier vers mon VPS personnel',
-    publishSuccess: 'Publication terminée.',
+    commandOpenSettings: 'Ouvrir les parametres du plugin Publier vers mon VPS personnel',
+    publishSuccess: 'Publication terminee.',
     publishError: 'Erreur lors de la publication (voir la console).',
-    noConfig: 'Aucune configuration VPS ou dossier définie.',
+    noConfig: 'Aucune configuration VPS ou dossier definie.',
     error: {
-      failureToExportSettings: 'Échec de l’exportation des paramètres.',
+      failureToExportSettings: "Echec de l'exportation des parametres.",
     },
   },
   settings: {
@@ -270,7 +297,7 @@ export const fr: Translations = {
       },
     },
     language: {
-      title: 'Sélection de la langue',
+      title: 'Selection de la langue',
       label: 'Langue',
       description: 'Choisir la langue du plugin.',
     },
@@ -282,12 +309,12 @@ export const fr: Translations = {
       nameDescription: 'Nom interne pour ce VPS.',
       urlLabel: 'URL',
       urlDescription: 'Ex : https://notes.mondomaine.fr',
-      apiKeyLabel: 'Clé API',
-      apiKeyDescription: 'Clé utilisée pour authentifier les envois.',
-      help: 'Les requêtes HTTP vers /api/upload utiliseront cette URL et cette clé.',
+      apiKeyLabel: 'Cle API',
+      apiKeyDescription: 'Cle utilisee pour authentifier les envois.',
+      help: 'Les requetes HTTP vers /api/upload utiliseront cette URL et cette cle.',
     },
     folders: {
-      title: 'Dossiers à publier',
+      title: 'Dossiers a publier',
       addButton: 'Ajouter un dossier',
       deleteButton: 'Supprimer le dossier',
       deleteLastForbidden: 'Au moins un dossier est requis.',
@@ -295,63 +322,76 @@ export const fr: Translations = {
       vaultDescription: 'Ex : Blog, Notes/Docs, etc.',
       routeLabel: 'Route du site',
       routeDescription: 'Ex : /blog, /docs, etc.',
-      sanitizationTitle: 'Règles de nettoyage',
-      sanitizationHelp: 'Définissez des règles regex appliquées au contenu avant publication.',
-      defaultSanitizationRuleBanner: 'Règle par défaut (non modifiable)',
-      addSanitizationRule: 'Ajouter une règle',
-      deleteSanitizationRule: 'Supprimer la règle',
-      ruleNameLabel: 'Nom de la règle',
+      sanitizationTitle: 'Regles de nettoyage',
+      sanitizationHelp: 'Definissez des regles regex appliquees au contenu avant publication.',
+      defaultSanitizationRuleBanner: 'Regle par defaut (non modifiable)',
+      addSanitizationRule: 'Ajouter une regle',
+      deleteSanitizationRule: 'Supprimer la regle',
+      ruleNameLabel: 'Nom de la regle',
       rulePatternLabel: 'Motif (regex)',
       ruleReplacementLabel: 'Remplacement',
-      ruleEnabledLabel: 'Activée',
+      ruleEnabledLabel: 'Activee',
       rulesHelp:
-        'Les notes dont le frontmatter correspond aux règles ci-dessous ne seront pas publiées.',
+        'Les notes dont le frontmatter correspond aux regles ci-dessous ne seront pas publiees.',
       vpsLabel: 'VPS cible',
-      vpsDescription: 'Choisissez la configuration VPS ? utiliser pour ce dossier.',
+      vpsDescription: 'Choisissez la configuration VPS a utiliser pour ce dossier.',
     },
     ignoreRules: {
-      title: 'Règles d’ignorance',
+      title: "Regles d'ignorance",
       description:
-        'Les notes avec ces propriétés de frontmatter seront ignorées lors de la publication.',
-      help: 'Vous pouvez définir des règles globales basées sur les propriétés et valeurs du frontmatter.',
-      addButton: "Ajouter une règle d'ignorance",
-      deleteButton: "Supprimer la règle d'ignorance",
-      propertyLabel: 'Propriété du frontmatter',
-      propertyDescription: 'Propriété à inspecter dans le frontmatter.',
-      valueLabel: 'Valeur(s) à ignorer',
+        'Les notes avec ces proprietes de frontmatter seront ignorees lors de la publication.',
+      help: 'Vous pouvez definir des regles globales basees sur les proprietes et valeurs du frontmatter.',
+      addButton: "Ajouter une regle d'ignorance",
+      deleteButton: "Supprimer la regle d'ignorance",
+      propertyLabel: 'Propriete du frontmatter',
+      propertyDescription: 'Propriete a inspecter dans le frontmatter.',
+      valueLabel: 'Valeur(s) a ignorer',
       valueDescription:
-        'Liste de valeurs à ignorer pour cette propriété (séparées par des virgules).',
-      modeValues: 'Ignorer des valeurs spécifiques',
-      modeBoolean: 'Ignorer si égal (true/false)',
-      frontmatterKeysLabel: 'Clés de frontmatter à supprimer',
+        'Liste de valeurs a ignorer pour cette propriete (separees par des virgules).',
+      modeValues: 'Ignorer des valeurs specifiques',
+      modeBoolean: 'Ignorer si egal (true/false)',
+      frontmatterKeysLabel: 'Cles de frontmatter a supprimer',
       frontmatterKeysDescription:
-        'Ces propriétés de frontmatter seront retirées des notes avant publication.',
+        'Ces proprietes de frontmatter seront retirees des notes avant publication.',
       frontmatterKeysPlaceholder: 'ex: publish, draft, private',
-      tagsLabel: 'Tags à exclure',
-      tagsDescription: 'Ces tags seront retirés des notes avant publication.',
+      tagsLabel: 'Tags a exclure',
+      tagsDescription: 'Ces tags seront retires des notes avant publication.',
       tagsPlaceholder: 'ex: draft, private, internal',
     },
     testConnection: {
       label: 'Tester la connexion',
-      notImplemented: 'Test de connexion non implémenté pour l’instant.',
-      failed: 'Échec du test de connexion.',
-      success: 'Test de connexion réussi.',
+      notImplemented: "Test de connexion non implemente pour l'instant.",
+      failed: 'Echec du test de connexion.',
+      success: 'Test de connexion reussi.',
       invalidConfig: 'Configuration VPS invalide.',
-      invalidJson: 'Réponse JSON invalide.',
-      missingApiKey: 'Clé API manquante.',
+      invalidJson: 'Reponse JSON invalide.',
+      missingApiKey: 'Cle API manquante.',
       invalidUrl: 'URL invalide.',
-      resultPrefix: 'Résultat du test de connexion : ',
-      unexpectedResponsePrefix: 'Réponse inattendue du serveur : ',
+      resultPrefix: 'Resultat du test de connexion : ',
+      unexpectedResponsePrefix: 'Reponse inattendue du serveur : ',
     },
     vault: {
       title: 'Vault & assets',
-      help: 'Réglages globaux liés au vault : dossier d’assets et fallback.',
-      assetsFolderLabel: 'Dossier d’assets dans le vault',
+      help: "Reglages globaux lies au vault : dossier d'assets et fallback.",
+      assetsFolderLabel: "Dossier d'assets dans le vault",
       assetsFolderDescription:
-        'Dossier dans le vault où les assets (images, fichiers) sont situés. Ex : Assets, Media, etc.',
-      enableAssetsVaultFallbackLabel: 'Permettre le recours à la racine du vault',
+        'Dossier dans le vault ou les assets (images, fichiers) sont situes. Ex : Assets, Media, etc.',
+      enableAssetsVaultFallbackLabel: 'Permettre le recours a la racine du vault',
       enableAssetsVaultFallbackDescription:
-        'Si activé, lorsqu’un asset n’est pas trouvé dans le dossier spécifié, le système le cherchera à la racine du vault et dans tous les dossiers.',
+        "Si active, lorsqu'un asset n'est pas trouve dans le dossier specifie, le systeme le cherchera a la racine du vault et dans tous les dossiers.",
+    },
+    advanced: {
+      title: 'Parametres avances',
+      logLevelLabel: 'Niveau de log',
+      logLevelDescription: 'De debug (verbeux) a warning (par defaut). Applique immediatement.',
+      logLevelDebug: 'Debug (tres verbeux)',
+      logLevelInfo: 'Info',
+      logLevelWarn: 'Warning (defaut)',
+      logLevelError: 'Error uniquement',
+      calloutStylesLabel: 'Styles de callouts (chemins CSS)',
+      calloutStylesDescription:
+        'Chemins (un par ligne ou separes par des virgules) vers des fichiers CSS du vault. Ils seront envoyes, parses et utilises pour etendre la configuration des callouts cote serveur.',
+      calloutStylesPlaceholder: '.obsidian/snippets/callouts.css',
     },
   },
 };

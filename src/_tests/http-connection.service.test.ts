@@ -9,7 +9,7 @@ const mockLogger = () =>
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
-  } as any);
+  }) as any;
 
 describe('testVpsConnection', () => {
   afterEach(() => {
@@ -19,7 +19,11 @@ describe('testVpsConnection', () => {
   it('retourne une erreur si la clé API est absente', async () => {
     const handler = { handleResponseAsync: jest.fn() };
     const logger = mockLogger();
-    const res = await testVpsConnection({ id: 'v', name: 'v', url: 'http://x', apiKey: '' }, handler as any, logger);
+    const res = await testVpsConnection(
+      { id: 'v', name: 'v', url: 'http://x', apiKey: '' },
+      handler as any,
+      logger
+    );
     expect(res.isError).toBe(true);
     expect(handler.handleResponseAsync).not.toHaveBeenCalled();
   });
@@ -27,7 +31,11 @@ describe('testVpsConnection', () => {
   it('retourne une erreur si l’URL est absente', async () => {
     const handler = { handleResponseAsync: jest.fn() };
     const logger = mockLogger();
-    const res = await testVpsConnection({ id: 'v', name: 'v', url: '', apiKey: 'k' }, handler as any, logger);
+    const res = await testVpsConnection(
+      { id: 'v', name: 'v', url: '', apiKey: 'k' },
+      handler as any,
+      logger
+    );
     expect(res.isError).toBe(true);
   });
 

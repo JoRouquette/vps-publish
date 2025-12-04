@@ -1,5 +1,5 @@
 import type { PublishPluginSettings } from '@core-domain/entities/publish-plugin-settings';
-import type { LoggerPort } from '@core-domain/ports/logger-port';
+import type { LoggerPort, LogLevel } from '@core-domain/ports/logger-port';
 import type { App } from 'obsidian';
 import type { I18nSettings } from '../../i18n';
 
@@ -12,6 +12,8 @@ export type PluginSettings = PublishPluginSettings &
     enableAssetsVaultFallback: boolean;
     frontmatterKeysToExclude: string[];
     frontmatterTagsToExclude: string[];
+    logLevel: LogLevel;
+    calloutStylePaths: string[];
   };
 
 export type SettingsSave = () => Promise<void>;
