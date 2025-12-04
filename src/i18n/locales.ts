@@ -331,24 +331,28 @@ export const fr: Translations = {
       rulePatternLabel: 'Motif (regex)',
       ruleReplacementLabel: 'Remplacement',
       ruleEnabledLabel: 'Activee',
-      rulesHelp: 'Les notes dont le frontmatter correspond aux regles ci-dessous ne seront pas publiees.',
+      rulesHelp:
+        'Les notes dont le frontmatter correspond aux regles ci-dessous ne seront pas publiees.',
       vpsLabel: 'VPS cible',
       vpsDescription: 'Choisissez la configuration VPS a utiliser pour ce dossier.',
     },
     ignoreRules: {
       title: "Regles d'ignorance",
-      description: 'Les notes avec ces proprietes de frontmatter seront ignorees lors de la publication.',
+      description:
+        'Les notes avec ces proprietes de frontmatter seront ignorees lors de la publication.',
       help: 'Vous pouvez definir des regles globales basees sur les proprietes et valeurs du frontmatter.',
       addButton: "Ajouter une regle d'ignorance",
       deleteButton: "Supprimer la regle d'ignorance",
       propertyLabel: 'Propriete du frontmatter',
       propertyDescription: 'Propriete a inspecter dans le frontmatter.',
       valueLabel: 'Valeur(s) a ignorer',
-      valueDescription: 'Liste de valeurs a ignorer pour cette propriete (separees par des virgules).',
+      valueDescription:
+        'Liste de valeurs a ignorer pour cette propriete (separees par des virgules).',
       modeValues: 'Ignorer des valeurs specifiques',
       modeBoolean: 'Ignorer si egal (true/false)',
       frontmatterKeysLabel: 'Cles de frontmatter a supprimer',
-      frontmatterKeysDescription: 'Ces proprietes de frontmatter seront retirees des notes avant publication.',
+      frontmatterKeysDescription:
+        'Ces proprietes de frontmatter seront retirees des notes avant publication.',
       frontmatterKeysPlaceholder: 'ex: publish, draft, private',
       tagsLabel: 'Tags a exclure',
       tagsDescription: 'Ces tags seront retires des notes avant publication.',
@@ -370,9 +374,11 @@ export const fr: Translations = {
       title: 'Vault & assets',
       help: "Reglages globaux lies au vault : dossier d'assets et fallback.",
       assetsFolderLabel: "Dossier d'assets dans le vault",
-      assetsFolderDescription: 'Dossier dans le vault ou les assets (images, fichiers) sont situes. Ex : Assets, Media, etc.',
+      assetsFolderDescription:
+        'Dossier dans le vault ou les assets (images, fichiers) sont situes. Ex : Assets, Media, etc.',
       enableAssetsVaultFallbackLabel: 'Permettre le recours a la racine du vault',
-      enableAssetsVaultFallbackDescription: "Si active, lorsqu'un asset n'est pas trouve dans le dossier specifie, le systeme le cherchera a la racine du vault et dans tous les dossiers.",
+      enableAssetsVaultFallbackDescription:
+        "Si active, lorsqu'un asset n'est pas trouve dans le dossier specifie, le systeme le cherchera a la racine du vault et dans tous les dossiers.",
     },
     advanced: {
       title: 'Parametres avances',
@@ -383,9 +389,9 @@ export const fr: Translations = {
       logLevelWarn: 'Warning (defaut)',
       logLevelError: 'Error uniquement',
       calloutStylesLabel: 'Styles de callouts (chemins CSS)',
-      calloutStylesDescription: 'Chemins (un par ligne ou separes par des virgules) vers des fichiers CSS du vault. Ils seront envoyes, parses et utilises pour etendre la configuration des callouts cote serveur.',
+      calloutStylesDescription:
+        'Chemins (un par ligne ou separes par des virgules) vers des fichiers CSS du vault. Ils seront envoyes, parses et utilises pour etendre la configuration des callouts cote serveur.',
       calloutStylesPlaceholder: '.obsidian/snippets/callouts.css',
     },
   },
 };
-

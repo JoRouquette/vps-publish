@@ -26,8 +26,7 @@ export function renderIgnoreRulesSection(root: HTMLElement, ctx: SettingsViewCon
     });
 
     const inputsRow = ruleContainer.createDiv({ cls: 'ptpv-ignore-rule__inputs' });
-    const mode =
-      rule.ignoreValues && rule.ignoreValues.length > 0 ? 'values' : 'boolean';
+    const mode = rule.ignoreValues && rule.ignoreValues.length > 0 ? 'values' : 'boolean';
 
     const propertyField = inputsRow.createDiv({ cls: 'ptpv-ignore-rule__field' });
     propertyField.createEl('label', {
@@ -63,14 +62,20 @@ export function renderIgnoreRulesSection(root: HTMLElement, ctx: SettingsViewCon
     const valuesRow = ruleContainer.createDiv({ cls: 'ptpv-ignore-rule__values' });
     const chipsRow = ruleContainer.createDiv({ cls: 'ptpv-ignore-rule__chips' });
     const booleanRow = ruleContainer.createDiv({ cls: 'ptpv-ignore-rule__boolean' });
-    const chipsLabel = chipsRow.createDiv({ cls: 'ptpv-ignore-rule__chips-label', text: t.settings.ignoreRules.valueLabel ?? 'Values to ignore' });
+    const chipsLabel = chipsRow.createDiv({
+      cls: 'ptpv-ignore-rule__chips-label',
+      text: t.settings.ignoreRules.valueLabel ?? 'Values to ignore',
+    });
     const chipsWrap = chipsRow.createDiv({ cls: 'ptpv-ignore-rule__chips-list' });
 
     const renderChips = () => {
       chipsWrap.empty();
       const values = rule.ignoreValues ?? [];
       if (!values.length) {
-        chipsWrap.createSpan({ cls: 'ptpv-chips-empty', text: t.settings.ignoreRules.valueDescription ?? 'val1, val2, val3' });
+        chipsWrap.createSpan({
+          cls: 'ptpv-chips-empty',
+          text: t.settings.ignoreRules.valueDescription ?? 'val1, val2, val3',
+        });
         return;
       }
       values.forEach((v, i) => {
@@ -87,7 +92,9 @@ export function renderIgnoreRulesSection(root: HTMLElement, ctx: SettingsViewCon
       });
     };
 
-    const valuesField = valuesRow.createDiv({ cls: 'ptpv-ignore-rule__field ptpv-ignore-rule__field--values' });
+    const valuesField = valuesRow.createDiv({
+      cls: 'ptpv-ignore-rule__field ptpv-ignore-rule__field--values',
+    });
     valuesField.createEl('label', {
       cls: 'ptpv-ignore-rule__label',
       text: t.settings.ignoreRules.valueLabel ?? 'Values to ignore',
@@ -111,13 +118,7 @@ export function renderIgnoreRulesSection(root: HTMLElement, ctx: SettingsViewCon
       const existing = rule.ignoreValues ?? [];
       const merged = [...existing];
       nextValues.forEach((val) => {
-        if (
-          !merged.some(
-            (x) =>
-              typeof x === 'string' &&
-              x.toLowerCase() === val.toLowerCase()
-          )
-        ) {
+        if (!merged.some((x) => typeof x === 'string' && x.toLowerCase() === val.toLowerCase())) {
           merged.push(val);
         }
       });

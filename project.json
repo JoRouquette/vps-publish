@@ -103,15 +103,9 @@
       }
     },
     "format": {
-      "executor": "@nx/js:prettier",
+      "executor": "nx:run-commands",
       "options": {
-        "lintFilePatterns": [
-          "apps/obsidian-vps-publish/**/*.ts",
-          "apps/obsidian-vps-publish/**/*.json",
-          "apps/obsidian-vps-publish/**/*.md",
-          "apps/obsidian-vps-publish/**/*.css",
-          "apps/obsidian-vps-publish/**/*.scss"
-        ]
+        "command": "npx prettier --check \"apps/obsidian-vps-publish/**/*.{ts,json,md,css,scss}\""
       }
     }
   }

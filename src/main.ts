@@ -221,8 +221,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     let maxBytesPerRequest = maxBytesRequested;
     let assetsUploaded = 0;
     const totalPlanned = publishableCount + assetsPlanned;
-    const progress =
-      totalPlanned > 0 ? new NoticeProgressAdapter('Publishing to VPS') : null;
+    const progress = totalPlanned > 0 ? new NoticeProgressAdapter('Publishing to VPS') : null;
     let progressStarted = false;
 
     try {
@@ -302,9 +301,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     }
   }
 
-  private async loadCalloutStyles(
-    paths: string[]
-  ): Promise<Array<{ path: string; css: string }>> {
+  private async loadCalloutStyles(paths: string[]): Promise<Array<{ path: string; css: string }>> {
     const styles: Array<{ path: string; css: string }> = [];
     const adapter: any = this.app.vault.adapter;
 
