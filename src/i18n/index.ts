@@ -2,6 +2,8 @@ import type { App } from 'obsidian';
 
 import { en, fr, type Locale, type Translations } from './locales';
 
+export type { Translations } from './locales';
+
 export type I18nSettings = {
   locale?: Locale | 'system';
 };

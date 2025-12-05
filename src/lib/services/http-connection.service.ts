@@ -22,11 +22,11 @@ export async function testVpsConnection(
     return { isError: true, error: new Error('Missing API key') };
   }
 
-  if (!vps.url) {
+  if (!vps.baseUrl) {
     return { isError: true, error: new Error('Invalid URL') };
   }
 
-  const baseUrl = normalizeBaseUrl(vps.url);
+  const baseUrl = normalizeBaseUrl(vps.baseUrl);
   const url = `${baseUrl}/api/ping`;
 
   logger.debug(`Pinging VPS at ${url}`);
