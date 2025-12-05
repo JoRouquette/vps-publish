@@ -38,7 +38,7 @@ export class NotesUploaderAdapter implements UploaderPort {
 
   async upload(notes: PublishableNote[]): Promise<boolean> {
     if (!Array.isArray(notes) || notes.length === 0) {
-      this._logger.info('No notes to upload.');
+      this._logger.debug('No notes to upload.');
       return false;
     }
 
@@ -59,7 +59,7 @@ export class NotesUploaderAdapter implements UploaderPort {
       this.progress?.advance(oversized.length);
     }
 
-    this._logger.info(
+    this._logger.debug(
       `Uploading ${notes.length} notes in ${batches.length} batch(es) (maxBytes=${this.maxBytesPerRequest}, skipped=${oversized.length})`
     );
     this._logger.debug('Notes upload batches details', {
@@ -96,7 +96,7 @@ export class NotesUploaderAdapter implements UploaderPort {
       this.progress?.advance(batch.length);
     }
 
-    this._logger.info('Successfully uploaded notes to session');
+    this._logger.debug('Successfully uploaded notes to session');
     return true;
   }
 }

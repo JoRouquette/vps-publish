@@ -47,7 +47,7 @@ export class AssetsUploaderAdapter implements UploaderPort {
 
   async upload(assets: ResolvedAssetFile[]): Promise<boolean> {
     if (!Array.isArray(assets) || assets.length === 0) {
-      this._logger.info('No assets to upload.');
+      this._logger.debug('No assets to upload.');
       return false;
     }
 
@@ -77,7 +77,7 @@ export class AssetsUploaderAdapter implements UploaderPort {
       this.progress?.advance(oversized.length);
     }
 
-    this._logger.info('Uploading assets to session', {
+    this._logger.debug('Uploading assets to session', {
       batchCount: batches.length,
       assetCount: apiAssets.length,
       skippedCount: oversized.length,
@@ -110,7 +110,7 @@ export class AssetsUploaderAdapter implements UploaderPort {
       this.progress?.advance(batch.length);
     }
 
-    this._logger.info('Assets upload completed');
+    this._logger.debug('Assets upload completed');
     return true;
   }
 

@@ -41,7 +41,15 @@ export function batchByBytes<T>(
     }
 
     batches.push(current);
-    current = [item];
+
+    // Check if the new item alone exceeds the limit
+    const singleItemSize = jsonSizeBytes(wrapBody([item]));
+    if (singleItemSize > maxBytes) {
+      oversized.push(item);
+      current = [];
+    } else {
+      current = [item];
+    }
   }
 
   if (current.length > 0) {

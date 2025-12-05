@@ -161,7 +161,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     let snapshotRaw: unknown = null;
     try {
       const adapter = this.app.vault.adapter;
-      const pluginDir = `.obsidian/plugins/${this.manifest.id}`;
+      const pluginDir = `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
       const filePath = `${pluginDir}/settings.json`;
       if (await adapter.exists(filePath)) {
         const content = await adapter.read(filePath);
@@ -197,8 +197,8 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     const res: HttpResponse = await testVpsConnection(vps, this.responseHandler, this.logger);
 
     if (!res.isError) {
-      this.logger.info('VPS connection test succeeded', { vpsId: vps.id });
-      this.logger.info(`Test connection message: ${res.text}`);
+      this.logger.debug('VPS connection test succeeded', { vpsId: vps.id });
+      this.logger.debug(`Test connection message: ${res.text}`);
       new Notice(t.settings.testConnection.success);
     } else {
       this.logger.error('VPS connection test failed', { vpsId: vps.id, error: res.error });
@@ -261,7 +261,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
       0
     );
 
-    scopedLogger.info('Total notes collected and parsed', {
+    scopedLogger.debug('Total notes collected and parsed', {
       collected: notes.length,
       publishable: publishableCount,
     });
@@ -297,7 +297,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
 
       sessionId = started.sessionId;
       const serverRequestLimit = started.maxBytesPerRequest;
-      this.logger.info('Session started', { sessionId, maxBytesPerRequest: serverRequestLimit });
+      this.logger.debug('Session started', { sessionId, maxBytesPerRequest: serverRequestLimit });
 
       if (progress && !progressStarted) {
         progress.start(totalPlanned);
@@ -332,7 +332,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
 
         await assetsUploader.upload(resolvedAssets);
 
-        this.logger.info('Assets uploaded', { assetsUploaded });
+        this.logger.debug('Assets uploaded', { assetsUploaded });
       }
 
       await sessionClient.finishSession(sessionId, {
@@ -386,7 +386,7 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     }
 
     if (styles.length) {
-      this.logger.info('Loaded callout styles', { count: styles.length });
+      this.logger.debug('Loaded callout styles', { count: styles.length });
     }
 
     return styles;
@@ -409,8 +409,8 @@ export default class ObsidianVpsPublishPlugin extends Plugin {
     const res: HttpResponse = await testVpsConnection(vps, this.responseHandler, this.logger);
 
     if (!res.isError) {
-      this.logger.info('VPS connection test succeeded');
-      this.logger.info(`Test connection message: ${res.text}`);
+      this.logger.debug('VPS connection test succeeded');
+      this.logger.debug(`Test connection message: ${res.text}`);
       new Notice(t.settings.testConnection.success);
     } else {
       this.logger.error('VPS connection test failed: ', res.error);

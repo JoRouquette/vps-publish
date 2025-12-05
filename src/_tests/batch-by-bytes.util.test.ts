@@ -34,7 +34,7 @@ describe('batchByBytes', () => {
   it('met les éléments trop volumineux dans oversized au lieu de throw', () => {
     const huge = 'x'.repeat(1024);
     const small = 'y';
-    const maxBytes = 10;
+    const maxBytes = 50; // Enough for small items
 
     const result = batchByBytes([small, huge, small], maxBytes, wrap);
 

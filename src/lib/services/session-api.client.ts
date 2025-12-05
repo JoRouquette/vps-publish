@@ -132,7 +132,7 @@ export class SessionApiClient {
   async cleanupVps(targetName: string): Promise<void> {
     const result = await this.postJson('/api/maintenance/cleanup', { targetName });
     if (result.isError) throw result.error ?? new Error('cleanupVps failed');
-    this.logger.info('VPS cleanup completed', { targetName });
+    this.logger.debug('VPS cleanup completed', { targetName });
   }
 }
 
