@@ -1,13 +1,21 @@
-name: Release Obsidian Plugin
+# vps-publish/.github/workflows/release.yml
+# Miroir en lecture seule : lint / test / build uniquement.
+# Plus de semantic-release ici — le monorepo est la seule source de vérité
+# (versions + GitHub Release). Pensez à supprimer .releaserc.json de ce dépôt.
+name: CI (mirror — read-only)
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 env:
   NODE_VERSION: '22.14.0'
+
 concurrency:
-  group: pipeline-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   quality:
     name: Lint, test and build
@@ -19,37 +27,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
+      # Pas de cache: npm — ces miroirs n'ont pas de package-lock.json versionné.
+      - run: npm install --no-audit --no-fund --legacy-peer-deps
+      # Lint/test informatifs : la qualité est garantie en amont par le monorepo.
+      # Ne pas bloquer le merge (le miroir ne peut pas être corrigé sans être écrasé au sync).
       - run: npm run lint
+        continue-on-error: true
       - run: npm run test
+        continue-on-error: true
       - run: npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: plugin-dist
-          path: main.js
-          retention-days: 1
-  release:
-    name: Semantic release + GitHub release
-    needs: quality
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - uses: actions/download-artifact@v4
-        with:
-          name: plugin-dist
-      - run: npm run build
-      - run: npx semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
