@@ -1,0 +1,1697 @@
+/* Conteneur global des settings du plugin */
+.obsidian-vps-publish-settings {
+  max-width: 100%;
+  width: 100%;
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 0.5rem;
+  box-sizing: border-box;
+}
+
+/* Limiter la largeur sur grands écrans pour une meilleure lisibilité */
+@media (min-width: 1200px) {
+  .obsidian-vps-publish-settings {
+    max-width: 900px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .obsidian-vps-publish-settings {
+    max-width: 90%;
+  }
+}
+
+@media (max-width: 899px) {
+  .obsidian-vps-publish-settings {
+    max-width: 100%;
+    padding: 0 0.25rem;
+  }
+}
+
+/* Progress bar for publishing notifications - Obsidian native style */
+.notice:has(.vps-publish-progress-container) {
+  min-width: 320px;
+  max-width: 400px;
+}
+
+.vps-publish-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vps-publish-progress-message {
+  font-weight: 500;
+  color: var(--text-normal);
+  font-size: 14px;
+}
+
+/* Use Obsidian's native progress bar classes */
+.vps-publish-progress-container .progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0.25rem 0;
+  position: relative;
+}
+
+.theme-dark .vps-publish-progress-container .progress-bar {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.vps-publish-progress-container .progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--interactive-accent-hover);
+  border-radius: 3px;
+  transition: width 0.3s ease-out;
+  will-change: width;
+  box-shadow: 0 0 4px rgba(var(--interactive-accent-rgb), 0.5);
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.vps-publish-progress-container .progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.3),
+    rgba(255, 255, 255, 0) 50%,
+    rgba(0, 0, 0, 0.1)
+  );
+  border-radius: 3px;
+}
+
+.vps-publish-progress-step {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Help Modal Styles */
+.vps-publish-help-modal .modal {
+  max-width: 800px;
+}
+
+.vps-publish-help-modal h2 {
+  margin-bottom: 1rem;
+  color: var(--text-normal);
+}
+
+.vps-publish-help-modal h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-accent);
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 0.3rem;
+}
+
+.vps-publish-help-modal .help-section {
+  margin-bottom: 1.5rem;
+}
+
+.vps-publish-help-modal .help-section p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+  color: var(--text-normal);
+}
+
+.vps-publish-help-modal .help-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.vps-publish-help-modal .help-example {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.vps-publish-help-modal .help-example pre {
+  margin: 0 0 0.5rem 0;
+  padding: 0.75rem;
+  background-color: var(--code-background);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.vps-publish-help-modal .help-example code {
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+  color: var(--code-normal);
+}
+
+.vps-publish-help-modal .help-example-description {
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.vps-publish-help-modal .help-footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.vps-publish-help-modal .help-footer p {
+  margin-bottom: 0.5rem;
+  color: var(--text-muted);
+}
+
+.vps-publish-help-modal .help-footer a {
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.vps-publish-help-modal .help-footer a:hover {
+  text-decoration: underline;
+}
+
+.vps-publish-help-modal .modal-button-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  gap: 0.5rem;
+}
+
+/* Titre principal */
+.obsidian-vps-publish-settings h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+/* Bloc générique (langue, VPS, dossiers, etc.) */
+.obsidian-vps-publish-settings .ptpv-block {
+  padding: 0.9rem 1.1rem;
+  border-radius: 10px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+/* Titre de section */
+.obsidian-vps-publish-settings .ptpv-block-title {
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+/* Texte d’aide sous les sections */
+.obsidian-vps-publish-settings .ptpv-help {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+/* Ajuster les Setting Obsidian à l’intérieur de notre conteneur */
+.obsidian-vps-publish-settings .setting-item {
+  padding: 0.3rem 0;
+}
+
+.obsidian-vps-publish-settings .setting-item:first-of-type {
+  margin-top: 0.2rem;
+}
+
+.obsidian-vps-publish-settings .setting-item:not(:last-of-type) {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.obsidian-vps-publish-settings .setting-item-info {
+  gap: 0.2rem;
+}
+
+/* Inputs texte full width (mais pas les toggles) */
+.obsidian-vps-publish-settings .setting-item-control input[type='text'] {
+  width: 100%;
+}
+
+.obsidian-vps-publish-settings .ptpv-button-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* Tag (si tu veux marquer des infos supplémentaires) */
+.obsidian-vps-publish-settings .ptpv-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+/* --- Styles spécifiques pour les blocs "dossier" --- */
+
+.obsidian-vps-publish-settings .ptpv-folder {
+  margin-top: 0.6rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.obsidian-vps-publish-settings .ptpv-folder legend {
+  padding: 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-normal);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+/* Liseré coloré à gauche pour bien distinguer chaque dossier */
+.obsidian-vps-publish-settings .ptpv-folder::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 3px;
+  border-radius: 999px;
+  background-color: var(--interactive-accent);
+  opacity: 0.9;
+}
+
+/* Titre du bloc dossier (nom ou #index) */
+.obsidian-vps-publish-settings .ptpv-folder > h4 {
+  margin: 0 0 0.4rem 0;
+  padding-left: 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-normal);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* On ajoute un peu de marge entre les settings d’un même dossier */
+.obsidian-vps-publish-settings .ptpv-folder .setting-item {
+  border-bottom: none;
+  padding: 0.25rem 0;
+}
+/* Folder responsive */
+@media (max-width: 1024px) {
+  .obsidian-vps-publish-settings .ptpv-folder {
+    padding: 0.65rem 0.65rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .obsidian-vps-publish-settings .ptpv-folder {
+    padding: 0.6rem 0.55rem;
+  }
+
+  .obsidian-vps-publish-settings .ptpv-folder legend {
+    font-size: 0.9rem;
+  }
+
+  .obsidian-vps-publish-settings .ptpv-folder > h4 {
+    font-size: 0.9rem;
+  }
+}
+/* Bouton "Add folder" intégré proprement */
+.obsidian-vps-publish-settings .setting-item-control button.mod-cta {
+  min-width: 7rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+}
+
+/* Hover subtil pour les boutons normaux */
+.obsidian-vps-publish-settings .ptpv-button-row button:not(.mod-cta) {
+  background-color: transparent;
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.obsidian-vps-publish-settings .ptpv-button-row button:not(.mod-cta):hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border);
+}
+
+/* Un peu d’air en bas pour ne pas coller au bord de la vue */
+.obsidian-vps-publish-settings {
+  padding-bottom: 1rem;
+}
+
+/* ------------------------ Chips (frontmatter / tags) ---------------------- */
+.obsidian-vps-publish-settings .ptpv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0.2rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-chips-empty {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+.obsidian-vps-publish-settings .ptpv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.obsidian-vps-publish-settings .ptpv-chip-remove {
+  cursor: pointer;
+  padding: 0 0.2rem;
+  border-radius: 50%;
+  color: var(--text-muted);
+}
+
+.obsidian-vps-publish-settings .ptpv-chip-remove:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.obsidian-vps-publish-settings .ptpv-suggest-count {
+  color: var(--text-muted);
+  margin-left: 0.25rem;
+  font-size: 0.9em;
+}
+
+.obsidian-vps-publish-settings .ptpv-sanitization {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-sanitization-rule {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  background-color: var(--background-secondary);
+}
+
+/* --------------------- Ignore rules layout --------------------- */
+.obsidian-vps-publish-settings .ptpv-ignore-rule {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  background: var(--background-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  margin-top: 0.6rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__title {
+  font-weight: 700;
+  color: var(--text-normal);
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.01em;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__inputs {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.obsidian-vps-publish-settings .ptpv-input {
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.obsidian-vps-publish-settings .ptpv-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 24%, transparent);
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0.15rem 0 0.25rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__values.is-values .setting-item {
+  flex: 1 1 280px;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__values.is-hidden,
+.obsidian-vps-publish-settings .ptpv-ignore-rule__chips.is-hidden {
+  display: none;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__boolean {
+  margin: 0.15rem 0 0.25rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__boolean.is-hidden {
+  display: none;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.1rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__chips-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.35rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-rule__actions button {
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+}
+
+@media (max-width: 720px) {
+  .obsidian-vps-publish-settings .ptpv-ignore-rule__inputs {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Styles pour les règles de nettoyage (cleanup rules) --- */
+
+.obsidian-vps-publish-settings .ptpv-cleanup-rule {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 2px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Règles par défaut - Style distinctif */
+.obsidian-vps-publish-settings .ptpv-cleanup-rule-default {
+  background: linear-gradient(
+    135deg,
+    var(--background-secondary) 0%,
+    var(--background-primary) 100%
+  );
+  border-color: var(--interactive-accent);
+  border-left-width: 4px;
+  position: relative;
+}
+
+.obsidian-vps-publish-settings .ptpv-cleanup-rule-default::before {
+  content: '★';
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  font-size: 1.2rem;
+  color: var(--interactive-accent);
+  opacity: 0.5;
+}
+
+.obsidian-vps-publish-settings .ptpv-cleanup-rule-default:hover {
+  border-left-color: var(--interactive-accent-hover);
+}
+
+/* Règles personnalisées - Style plus léger */
+.obsidian-vps-publish-settings .ptpv-cleanup-rule:not(.ptpv-cleanup-rule-default) {
+  border-style: dashed;
+}
+
+/* Règle désactivée - Style atténué */
+.obsidian-vps-publish-settings .ptpv-cleanup-rule .ptpv-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Espacement entre les settings à l'intérieur des règles */
+.obsidian-vps-publish-settings .ptpv-cleanup-rule .setting-item {
+  padding: 0.5rem 0;
+  margin: 0;
+}
+
+.obsidian-vps-publish-settings .ptpv-cleanup-rule .setting-item:first-of-type {
+  padding-top: 0;
+}
+
+.obsidian-vps-publish-settings .ptpv-cleanup-rule .setting-item:last-of-type {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* Titre de la règle avec badge pour les règles par défaut */
+.obsidian-vps-publish-settings .ptpv-cleanup-rule-default .setting-item-name {
+  font-weight: 600;
+}
+
+/* Inputs désactivés dans les règles par défaut */
+.obsidian-vps-publish-settings .ptpv-cleanup-rule-default input[type='text']:disabled {
+  background-color: var(--background-modifier-form-field);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Input error indicator for empty regex fields */
+.obsidian-vps-publish-settings .ptpv-input-error {
+  border: 2px solid var(--text-error) !important;
+  background-color: var(--background-modifier-error) !important;
+}
+
+.obsidian-vps-publish-settings .ptpv-input-error:focus {
+  box-shadow: 0 0 0 2px var(--text-error) !important;
+}
+
+/* Séparateur visuel entre les règles */
+.obsidian-vps-publish-settings .ptpv-cleanup-rule + .ptpv-cleanup-rule {
+  margin-top: 1.5rem;
+}
+
+/* Large text area for callout styles and other multi-line inputs */
+.obsidian-vps-publish-settings .ptpv-textarea-large {
+  min-height: 80px;
+}
+
+/* ============================================================================
+   Folders Settings UI - Enhanced UX
+   ============================================================================
+   
+   These styles enhance the visual presentation of the refactored folders
+   settings UI with search, sort, compact list, and detailed editor.
+   ============================================================================ */
+
+/* Toolbar
+   -------------------------------------------------------------------------- */
+.ptpv-folders-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 1rem;
+}
+
+.ptpv-folders-toolbar .setting-item {
+  border: none;
+  padding: 0;
+  margin: 0;
+  flex: 0 1 auto;
+}
+
+.ptpv-folders-toolbar input[type='text'] {
+  flex: 1 1 auto;
+  min-width: 150px;
+  max-width: 100%;
+}
+
+.ptpv-folders-toolbar select {
+  flex: 0 1 auto;
+  min-width: 150px;
+}
+
+.ptpv-folders-toolbar button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Toolbar responsive pour petits écrans desktop */
+@media (max-width: 1024px) {
+  .ptpv-folders-toolbar input[type='text'] {
+    min-width: 120px;
+  }
+
+  .ptpv-folders-toolbar select {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ptpv-folders-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .ptpv-folders-toolbar .setting-item,
+  .ptpv-folders-toolbar input[type='text'],
+  .ptpv-folders-toolbar select,
+  .ptpv-folders-toolbar button {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: unset;
+  }
+}
+
+/* Results count and no-results message
+   -------------------------------------------------------------------------- */
+.ptpv-folders-count {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.ptpv-folders-no-results {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  background: var(--background-secondary);
+  border-radius: 4px;
+}
+
+/* Compact folder list
+   -------------------------------------------------------------------------- */
+.ptpv-folders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Compact folder item
+   -------------------------------------------------------------------------- */
+.ptpv-folder-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+}
+
+.ptpv-folder-item-label {
+  font-size: 1rem;
+  color: var(--text-normal);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.ptpv-folder-item-label strong {
+  font-weight: 600;
+}
+
+.ptpv-folder-item-subtext {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.ptpv-folder-item-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+  align-items: center;
+}
+
+.ptpv-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  background: var(--background-modifier-border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ptpv-folder-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ptpv-folder-item-actions button {
+  flex: 1 1 auto;
+  min-width: 80px;
+  max-width: 150px;
+}
+
+/* Folder items responsive */
+@media (max-width: 1024px) {
+  .ptpv-folder-item {
+    padding: 0.65rem;
+  }
+
+  .ptpv-folder-item-label {
+    font-size: 0.95rem;
+  }
+
+  .ptpv-folder-item-subtext {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .ptpv-folder-item {
+    padding: 0.6rem;
+  }
+
+  .ptpv-folder-item-actions {
+    flex-direction: column;
+  }
+
+  .ptpv-folder-item-actions button {
+    max-width: unset;
+    width: 100%;
+  }
+}
+
+/* Detailed editor
+   -------------------------------------------------------------------------- */
+.ptpv-folders-editor {
+  margin-bottom: 1.5rem;
+  border: 2px solid var(--interactive-accent);
+  border-radius: 6px;
+  padding: 1rem;
+  background: var(--background-primary);
+  box-sizing: border-box;
+}
+
+.ptpv-folder-editor legend {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--interactive-accent);
+  padding: 0 0.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+/* Editor responsive */
+@media (max-width: 1024px) {
+  .ptpv-folders-editor {
+    padding: 0.85rem;
+  }
+
+  .ptpv-folder-editor legend {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .ptpv-folders-editor {
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .ptpv-folder-editor legend {
+    font-size: 0.95rem;
+    padding: 0 0.35rem;
+  }
+}
+
+/* Warning box (flatten tree)
+   -------------------------------------------------------------------------- */
+.ptpv-warning {
+  padding: 0.75rem;
+  margin: 0.75rem 0;
+  background: var(--background-modifier-error);
+  border: 1px solid var(--background-modifier-error-hover);
+  border-radius: 4px;
+  color: var(--text-error);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.ptpv-warning strong {
+  font-weight: 600;
+}
+
+/* Advanced options (collapsible)
+   -------------------------------------------------------------------------- */
+.ptpv-advanced-options {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.ptpv-advanced-options summary {
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.5rem 0;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.ptpv-advanced-options summary:hover {
+  color: var(--text-normal);
+}
+
+.ptpv-advanced-options[open] summary {
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 0.75rem;
+}
+
+.ptpv-advanced-content {
+  padding-top: 0.5rem;
+}
+
+/* Cleanup ignore list (inside advanced options)
+   -------------------------------------------------------------------------- */
+.ptpv-folder-cleanup-ignore {
+  margin-top: 1rem;
+}
+
+.ptpv-cleanup-ignore-list {
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  background: var(--background-primary);
+  box-sizing: border-box;
+}
+
+.ptpv-cleanup-ignore-list .setting-item {
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 0.5rem 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.ptpv-cleanup-ignore-list .setting-item:last-child {
+  border-bottom: none;
+}
+
+/* Additional files section */
+.ptpv-folder-additional-files {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+}
+
+.ptpv-additional-files-list {
+  margin: 0.5rem 0 1rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 2rem;
+}
+
+.ptpv-empty-list {
+  color: var(--text-muted);
+  font-style: italic;
+  align-self: center;
+}
+
+.ptpv-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  transition: background 0.2s;
+}
+
+.ptpv-file-chip:hover {
+  background: var(--background-modifier-hover);
+}
+
+.ptpv-file-chip-label {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ptpv-file-chip-remove {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.2em;
+  line-height: 1;
+  padding: 0;
+  width: 1.2em;
+  height: 1.2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.ptpv-file-chip-remove:hover {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}
+
+/* File suggester modal (inline) */
+.ptpv-file-suggester-modal {
+  position: relative;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+}
+
+.ptpv-file-suggester-input-wrapper {
+  width: 100%;
+}
+
+.ptpv-file-suggester-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.9rem;
+}
+
+.ptpv-file-suggester-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+/* Advanced options responsive */
+@media (max-width: 1024px) {
+  .ptpv-advanced-options {
+    padding: 0.65rem;
+  }
+
+  .ptpv-cleanup-ignore-list {
+    max-height: 250px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ptpv-advanced-options {
+    padding: 0.6rem;
+  }
+
+  .ptpv-cleanup-ignore-list {
+    max-height: 200px;
+    padding: 0.4rem;
+  }
+}
+
+/* Global responsive adjustments for settings items
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .obsidian-vps-publish-settings .setting-item-control input[type='text'],
+  .obsidian-vps-publish-settings .setting-item-control textarea {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .obsidian-vps-publish-settings .setting-item {
+    padding: 0.4rem 0;
+  }
+
+  .obsidian-vps-publish-settings .setting-item-info {
+    gap: 0.3rem;
+  }
+
+  .obsidian-vps-publish-settings .setting-item-control input[type='text'],
+  .obsidian-vps-publish-settings .setting-item-control textarea,
+  .obsidian-vps-publish-settings .setting-item-control select {
+    font-size: 14px;
+    padding: 0.4rem;
+  }
+
+  .obsidian-vps-publish-settings .ptpv-button-row {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .obsidian-vps-publish-settings .ptpv-button-row button {
+    width: 100%;
+  }
+}
+
+/* Dark mode adjustments
+   -------------------------------------------------------------------------- */
+.theme-dark .ptpv-indicator {
+  background: var(--background-modifier-border-hover);
+}
+
+.theme-dark .ptpv-warning {
+  background: rgba(var(--color-red-rgb), 0.1);
+  border-color: rgba(var(--color-red-rgb), 0.3);
+}
+
+/* ========================================================================
+   NEW ROUTE TREE UI STYLES (Route-First Model)
+   ======================================================================== */
+
+/* Routes VPS section container */
+.ptpv-routes-vps-section {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-secondary);
+}
+
+/* Route tree container */
+.ptpv-routes-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 1rem;
+}
+
+/* Single route node container */
+.ptpv-route-node {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Compact route item (always visible) */
+.ptpv-route-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  margin-bottom: 2px;
+  transition: background-color 0.2s ease;
+}
+
+/* Drag handle icon */
+.ptpv-route-drag-handle {
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  cursor: grab;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ptpv-route-drag-handle:hover {
+  color: var(--text-normal);
+}
+
+.ptpv-route-drag-handle:active {
+  cursor: grabbing;
+}
+
+.ptpv-route-drag-handle svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Drag states */
+.ptpv-route-item.is-dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.ptpv-route-item.drag-over-top {
+  border-top: 3px solid var(--interactive-accent);
+}
+
+.ptpv-route-item.drag-over-bottom {
+  border-bottom: 3px solid var(--interactive-accent);
+}
+
+.ptpv-route-item.drag-over-child {
+  background-color: var(--background-modifier-hover);
+  border: 2px dashed var(--interactive-accent);
+}
+
+/* Expand/collapse button */
+.ptpv-route-expand-btn {
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  outline: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ptpv-route-expand-btn:hover {
+  background: transparent;
+  color: var(--text-normal);
+  box-shadow: none;
+}
+
+.ptpv-route-expand-btn:focus,
+.ptpv-route-expand-btn:active {
+  box-shadow: none;
+  outline: none;
+  border: none;
+}
+
+.ptpv-route-expand-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ptpv-route-expand-spacer {
+  width: 20px;
+  flex-shrink: 0;
+}
+
+/* Route label */
+.ptpv-route-label {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Route label with conflicts */
+.ptpv-route-label.ptpv-route-has-conflicts {
+  color: var(--text-error);
+  font-weight: 600;
+}
+
+.ptpv-route-label.ptpv-route-has-conflicts:hover {
+  cursor: help;
+}
+
+/* Validation warning banner */
+.ptpv-validation-warning {
+  padding: 1rem;
+  margin: 0.5rem 0 1rem 0;
+  background: var(--background-secondary);
+  border: 2px solid var(--text-error);
+  border-radius: 6px;
+}
+
+.ptpv-validation-warning strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-error);
+  font-size: 1rem;
+}
+
+.ptpv-validation-warning ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  list-style-type: disc;
+}
+
+.ptpv-validation-warning li {
+  margin: 0.25rem 0;
+}
+
+.ptpv-validation-warning .setting-item-description {
+  margin-top: 0.75rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Route actions */
+.ptpv-route-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.ptpv-route-actions button {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+}
+
+/* Route editor (expanded) */
+.ptpv-route-editor {
+  position: relative; /* For close button positioning */
+  padding: 1rem;
+  margin: 0.5rem 0 0.5rem 40px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-secondary);
+}
+
+/* Close button in top-right corner */
+.ptpv-route-editor-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--text-muted);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.ptpv-route-editor-close:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.ptpv-route-editor-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ptpv-route-editor h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+.ptpv-route-editor .setting-item {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.ptpv-route-editor .setting-item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.ptpv-route-editor .setting-item-info {
+  margin-bottom: 0.75rem;
+}
+
+.ptpv-route-editor .setting-item-control {
+  width: 100%;
+}
+
+.ptpv-route-editor .setting-item-control input[type='text'],
+.ptpv-route-editor .setting-item-control .search-input-container {
+  width: 100%;
+}
+
+/* Children container */
+.ptpv-route-children {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-left: 0;
+}
+
+/* Route actions with save/cancel buttons */
+.ptpv-routes-actions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--background-modifier-border);
+  justify-content: space-between;
+}
+
+.ptpv-routes-actions button {
+  min-width: 120px;
+}
+
+.ptpv-routes-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ptpv-routes-actions {
+    flex-direction: column;
+  }
+
+  .ptpv-routes-actions button {
+    width: 100%;
+  }
+
+  .ptpv-route-item {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .ptpv-route-label {
+    flex-basis: 100%;
+    margin-bottom: 0.25rem;
+  }
+
+  .ptpv-route-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .ptpv-route-actions button {
+    flex: 1;
+    min-width: 60px;
+  }
+
+  .ptpv-route-editor {
+    margin-left: 10px;
+    padding: 0.75rem;
+  }
+}
+
+/* =============================================================================
+   PUBLISH CONFIRMATION MODAL
+   ============================================================================= */
+
+/* Icon in the native modal title bar */
+.ptpv-confirm-modal__icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.35rem;
+  color: var(--interactive-accent);
+  vertical-align: middle;
+}
+
+.ptpv-confirm-modal__icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Summary table */
+.ptpv-confirm-modal__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.25rem;
+}
+
+.ptpv-confirm-modal__table td {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  vertical-align: baseline;
+}
+
+.ptpv-confirm-modal__table tr:last-child td {
+  border-bottom: none;
+}
+
+.ptpv-confirm-modal__label {
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  padding-right: 1.5rem;
+  width: 1%;
+}
+
+.ptpv-confirm-modal__value {
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+/* Estimated hint below the table */
+.ptpv-confirm-modal__hint {
+  color: var(--text-faint);
+  font-size: var(--font-smallest);
+  margin: 0.25rem 0 0;
+}
+
+.ptpv-confirm-modal__checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+
+.ptpv-confirm-modal__checkbox input[type='checkbox'] {
+  margin-top: 0.15rem;
+}
+
+.ptpv-confirm-modal__checkbox-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.ptpv-confirm-modal__checkbox-label {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.ptpv-confirm-modal__checkbox-description {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.35;
+}
+
+/* =============================================================================
+   ROUTE KEYBOARD MOVE CONTROLS
+   ============================================================================= */
+
+.ptpv-route-move-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: 4px;
+}
+
+.ptpv-route-move-btn {
+  padding: 0;
+  width: 16px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  opacity: 0.5;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+
+.ptpv-route-move-btn:hover {
+  opacity: 1;
+  background: var(--background-modifier-hover);
+}
+
+.ptpv-route-move-btn:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.ptpv-route-move-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Hide move controls by default, show on hover */
+.ptpv-route-item .ptpv-route-move-controls {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ptpv-route-item:hover .ptpv-route-move-controls,
+.ptpv-route-item:focus-within .ptpv-route-move-controls {
+  opacity: 1;
+}
+
+/* ============================================================================
+   VPS Section - Primary VPS styling
+   ============================================================================ */
+
+.obsidian-vps-publish-settings .ptpv-vps {
+  margin-top: 0.6rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.obsidian-vps-publish-settings .ptpv-vps legend {
+  padding: 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-normal);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Primary VPS gets accent left border */
+.obsidian-vps-publish-settings .ptpv-vps--primary {
+  border-left: 3px solid var(--interactive-accent);
+}
+
+/* Primary badge pill */
+.obsidian-vps-publish-settings .ptpv-vps-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* ============================================================================
+   Ignore Rules Section - Global vs Per-VPS hierarchy
+   ============================================================================ */
+
+.obsidian-vps-publish-settings .ptpv-section-subheading {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-normal);
+  margin: 0.75rem 0 0.25rem;
+  padding-left: 0.25rem;
+  border-left: 3px solid var(--interactive-accent);
+}
+
+.obsidian-vps-publish-settings .ptpv-section-help {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem 0.5rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-global-section {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--background-modifier-border);
+  margin-bottom: 0.5rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-pervps-header {
+  margin-top: 0.5rem;
+}
+
+.obsidian-vps-publish-settings .ptpv-ignore-vps-section {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background-color: var(--background-secondary-alt);
+}
+
+/* ============================================================================
+   Help Modal - Table of Contents navigation
+   ============================================================================ */
+
+.vps-publish-help-modal .help-toc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.vps-publish-help-modal .help-toc-label {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.vps-publish-help-modal .help-toc-link {
+  color: var(--text-accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.vps-publish-help-modal .help-toc-link:hover {
+  text-decoration: underline;
+}
+
+.vps-publish-help-modal .help-toc-sep {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Scroll padding for anchor targets */
+.vps-publish-help-modal .help-section[id] {
+  scroll-margin-top: 1rem;
+}
