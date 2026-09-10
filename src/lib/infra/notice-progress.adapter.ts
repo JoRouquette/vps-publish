@@ -1,0 +1,155 @@
+import type { ProgressPort } from '@core-domain/ports/progress-port';
+import { Notice } from 'obsidian';
+
+import { translate } from '../../i18n';
+import type { Translations } from '../../i18n/locales';
+import { throttle } from '../utils/throttle.util';
+import type { UiPressureMonitorAdapter } from './ui-pressure-monitor.adapter';
+
+/**
+ * Progress adapter using HTML progress bar instead of text percentage.
+ * Progress is step-weighted, not file-count based, to avoid revealing internal statistics.
+ * Updates are throttled to 100ms to prevent UI spam.
+ */
+export class NoticeProgressAdapter implements ProgressPort {
+  private readonly throttledUpdate: ((percent: number, stepMessage: string) => void) & {
+    flush: () => void;
+    cancel: () => void;
+  };
+
+  constructor(
+    private readonly label = 'Publishing',
+    private readonly translations?: Translations,
+    private readonly uiMonitor?: UiPressureMonitorAdapter,
+    private readonly throttleMs: number = 100 // Throttle updates to max 10/sec
+  ) {
+    // Create throttled version of the actual update function
+    this.throttledUpdate = throttle(
+      (percent: number, stepMessage: string) => {
+        this.performUpdate(percent, stepMessage);
+      },
+      {
+        intervalMs: throttleMs,
+        leading: true, // Update immediately on first call
+        trailing: true, // Update with last value after throttle period
+      }
+    );
+  }
+
+  private notice: Notice | null = null;
+  private progressBarFillEl: HTMLDivElement | null = null;
+  private messageEl: HTMLSpanElement | null = null;
+  private stepEl: HTMLSpanElement | null = null;
+  private currentStep = '';
+  private currentPercent = 0;
+  private startTime: number | null = null;
+
+  start(_total: number): void {
+    this.startTime = Date.now();
+    this.currentPercent = 0;
+    this.currentStep = this.translations
+      ? translate(this.translations, 'common.initializing')
+      : 'Initializing...';
+
+    // Create notice with Obsidian-style progress bar.
+    // Les enfants sont créés en place (createDiv/createSpan) : plus d'appendChild.
+    const container = createDiv({ cls: 'vps-publish-progress-container' });
+
+    // Message
+    const messageSpan = container.createSpan({
+      cls: 'vps-publish-progress-message',
+      text: this.label,
+    });
+    this.messageEl = messageSpan;
+
+    // Progress bar wrapper (Obsidian-style)
+    const progressWrapper = container.createDiv({ cls: 'progress-bar' });
+
+    const progressBarFill = progressWrapper.createDiv({ cls: 'progress-bar-fill' });
+    progressBarFill.setCssStyles({ width: '0%' });
+    this.progressBarFillEl = progressBarFill;
+
+    // Step message
+    const stepSpan = container.createSpan({
+      cls: 'vps-publish-progress-step',
+      text: this.currentStep,
+    });
+    this.stepEl = stepSpan;
+
+    this.notice = new Notice('', 0);
+    // Replace notice content with our custom HTML
+    const noticeEl = (this.notice as unknown as { noticeEl?: HTMLElement }).noticeEl;
+    if (noticeEl) {
+      noticeEl.empty();
+      // Marqueur explicite pour le CSS : évite un sélecteur `:has()` sur `.notice`.
+      noticeEl.addClass('vps-publish-progress-notice');
+      noticeEl.appendChild(container);
+    }
+  }
+
+  advance(_step = 1): void {
+    // Step parameter is ignored - we use step-based weights instead
+    // Progress is updated via updateProgress(percent, stepMessage)
+  }
+
+  /**
+   * Update progress with explicit percentage and step message.
+   * This should be called by StepProgressManager, not used directly.
+   * Updates are throttled to prevent UI spam.
+   */
+  updateProgress(percent: number, stepMessage: string): void {
+    // Record progress update for UI pressure monitoring (before throttling)
+    this.uiMonitor?.recordProgressUpdate();
+
+    // Store current values (for immediate access if needed)
+    this.currentPercent = Math.min(100, Math.max(0, percent));
+    this.currentStep = stepMessage;
+
+    // Throttled update to DOM
+    this.throttledUpdate(percent, stepMessage);
+  }
+
+  /**
+   * Actual update implementation (called by throttled function)
+   */
+  private performUpdate(percent: number, stepMessage: string): void {
+    if (this.progressBarFillEl) {
+      this.progressBarFillEl.setCssStyles({ width: `${percent}%` });
+    }
+
+    if (this.stepEl) {
+      this.stepEl.textContent = stepMessage;
+    }
+  }
+
+  finish(): void {
+    // Flush any pending throttled update to show final state
+    this.throttledUpdate.flush();
+
+    const duration = this.startTime ? Date.now() - this.startTime : 0;
+    const durationText = this.formatDuration(duration);
+
+    // Close persistent notice
+    const closableNotice = this.notice as (Notice & { hide?: () => void }) | null;
+    closableNotice?.hide?.();
+    this.notice = null;
+
+    // Show completion message with duration (use i18n if available)
+    const message = this.translations
+      ? translate(this.translations, 'notice.publishingCompleted', {
+          label: this.label,
+          duration: durationText,
+        })
+      : `✅ ${this.label} completed in ${durationText}`;
+
+    new Notice(message, 5000);
+  }
+
+  private formatDuration(ms: number): string {
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+}
