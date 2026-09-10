@@ -1,0 +1,296 @@
+import { type AssetRef } from '@core-domain/entities/asset-ref';
+import type { PublishableNote } from '@core-domain/entities/publishable-note';
+import { type ResolvedAssetFile } from '@core-domain/entities/resolved-asset-file';
+import { type AssetsVaultPort } from '@core-domain/ports/assets-vault-port';
+import type { LoggerPort } from '@core-domain/ports/logger-port';
+import { type App, type TFile } from 'obsidian';
+
+type AssetLookupIndex = {
+  byPathSuffix: Map<string, TFile[]>;
+  byName: Map<string, TFile[]>;
+};
+
+export class ObsidianAssetsVaultAdapter implements AssetsVaultPort {
+  private readonly _logger: LoggerPort;
+
+  constructor(
+    private readonly app: App,
+    logger: LoggerPort
+  ) {
+    this._logger = logger.child({ adapter: 'ObsidianAssetsVaultAdapter' });
+    this._logger.debug('ObsidianAssetsVaultAdapter initialized');
+  }
+
+  async resolveAssetsFromNotes(
+    notes: PublishableNote[],
+    assetsFolder: string,
+    enableVaultFallback: boolean
+  ): Promise<ResolvedAssetFile[]> {
+    const normalizedAssetsFolder = this.normalizeFolder(assetsFolder);
+    const allFiles = this.app.vault.getFiles();
+    const lookupIndex = this.buildLookupIndex(allFiles);
+    const resolvedAssets: ResolvedAssetFile[] = [];
+
+    for (const note of notes) {
+      if (!note.assets || !Array.isArray(note.assets) || note.assets.length === 0) {
+        this._logger.debug('No assets found in note', { noteVaultPath: note.vaultPath });
+        continue;
+      }
+
+      for (const asset of note.assets) {
+        this._logger.debug('Resolving asset for note', {
+          noteVaultPath: note.vaultPath,
+          asset,
+          assetsFolder: normalizedAssetsFolder,
+          enableVaultFallback,
+        });
+
+        // 1. Déterminer la cible textuelle
+        const target = this.extractLinkTarget(asset);
+        if (!target) {
+          this._logger.debug('Unable to extract link target from asset', {
+            assetTarget: asset.target,
+          });
+          continue;
+        }
+
+        const normalizedTarget = this.normalizeTarget(target);
+
+        this._logger.debug('Searching for asset target', {
+          target: normalizedTarget,
+          assetsFolder: normalizedAssetsFolder,
+          note: note.vaultPath,
+        });
+
+        const baseName = normalizedTarget.split('/').pop() ?? normalizedTarget;
+
+        // 2. Recherche prioritaire dans le dossier d’assets
+        let file: TFile | undefined;
+
+        if (normalizedAssetsFolder) {
+          file = this.findIndexedFile(lookupIndex, normalizedTarget, baseName, (candidate) =>
+            this.isUnderFolder(candidate.path, normalizedAssetsFolder)
+          );
+
+          if (file) {
+            this._logger.debug('Asset found in assets folder', {
+              filePath: file.path,
+              assetsFolder: normalizedAssetsFolder,
+            });
+          } else {
+            this._logger.debug('Asset not found in assets folder, will try fallback if enabled', {
+              target,
+              assetsFolder: normalizedAssetsFolder,
+            });
+          }
+        }
+
+        // 3. Fallback : tout le vault
+        if (!file && enableVaultFallback) {
+          file = this.findIndexedFile(lookupIndex, normalizedTarget, baseName);
+
+          if (file) {
+            this._logger.debug('Asset found in vault (fallback)', {
+              filePath: file.path,
+            });
+          } else {
+            this._logger.debug('Asset not found in vault during fallback', {
+              target,
+            });
+          }
+        }
+
+        if (!file) {
+          this._logger.warn('Asset not found in vault - will not be uploaded', {
+            target,
+            baseName,
+            note: note.vaultPath,
+            assetsFolder: normalizedAssetsFolder,
+            vaultFallbackEnabled: enableVaultFallback,
+            hint: `Check that the file "${baseName}" exists in your vault, and that assetsFolder setting is correct`,
+          });
+          continue;
+        }
+
+        // 4. Lecture binaire
+        this._logger.debug('Reading binary content for asset', {
+          filePath: file.path,
+        });
+
+        const content = await this.app.vault.readBinary(file);
+
+        const relativeAssetPath =
+          normalizedTarget || this.computeRelativeAssetPath(file.path, normalizedAssetsFolder);
+
+        const resolved: ResolvedAssetFile = {
+          vaultPath: file.path,
+          fileName: file.name,
+          relativeAssetPath,
+          content,
+          mimeType: undefined,
+        };
+
+        this._logger.debug('Resolved asset file', { resolved });
+
+        resolvedAssets.push(resolved);
+      }
+    }
+
+    // Log summary of asset resolution
+    const totalAssets = notes.reduce((sum, n) => sum + (n.assets?.length ?? 0), 0);
+    const resolvedCount = resolvedAssets.length;
+    const missingCount = totalAssets - resolvedCount;
+
+    if (missingCount > 0) {
+      this._logger.warn('Some assets could not be resolved', {
+        totalAssets,
+        resolved: resolvedCount,
+        missing: missingCount,
+        assetsFolder: this.normalizeFolder(assetsFolder),
+        vaultFallbackEnabled: enableVaultFallback,
+      });
+    } else {
+      this._logger.info('All assets resolved successfully', {
+        totalAssets,
+        resolved: resolvedCount,
+      });
+    }
+
+    return resolvedAssets;
+  }
+
+  private extractLinkTarget(asset: AssetRef): string | null {
+    this._logger.debug('Extracting link target from asset', { asset });
+    const assetWithExtras = asset as AssetRef & {
+      fileName?: unknown;
+      linkText?: unknown;
+    };
+
+    if (typeof assetWithExtras.fileName === 'string' && assetWithExtras.fileName.trim()) {
+      const v = assetWithExtras.fileName.trim();
+      this._logger.debug('Link target found via fileName', { fileName: v });
+      return v;
+    }
+
+    if (typeof assetWithExtras.target === 'string' && assetWithExtras.target.trim()) {
+      const v = assetWithExtras.target.trim();
+      this._logger.debug('Link target found via target', { target: v });
+      return v;
+    }
+
+    if (typeof assetWithExtras.linkText === 'string' && assetWithExtras.linkText.trim()) {
+      const v = assetWithExtras.linkText.trim();
+      this._logger.debug('Link target found via linkText', { linkText: v });
+      return v;
+    }
+
+    if (typeof assetWithExtras.raw === 'string') {
+      const raw: string = assetWithExtras.raw;
+      const match = raw.match(/!\[\[([^\]]+)\]\]/);
+      const inner = (match ? match[1] : raw).trim();
+
+      if (!inner) {
+        this._logger.debug('No inner content found in raw asset', { raw });
+        return null;
+      }
+
+      const firstPart = inner.split('|')[0].trim();
+      this._logger.debug('Extracted link target from raw', { firstPart });
+      return firstPart || null;
+    }
+
+    this._logger.debug('Unable to extract link target from asset', { asset });
+    return null;
+  }
+
+  // helpers identiques
+  private normalizeFolder(folder: string | null | undefined): string {
+    if (!folder) return '';
+    let f = folder.trim().replace(/\\/g, '/');
+    if (f.startsWith('/')) f = f.slice(1);
+    if (f.endsWith('/')) f = f.slice(0, -1);
+    return f;
+  }
+
+  private isUnderFolder(path: string, folder: string): boolean {
+    if (!folder) return false;
+    const p = path.replace(/\\/g, '/');
+    return p === folder || p.startsWith(folder + '/');
+  }
+
+  private computeRelativeAssetPath(filePath: string, normalizedAssetsFolder: string): string {
+    const p = filePath.replace(/\\/g, '/');
+    if (!normalizedAssetsFolder) return p;
+
+    if (p === normalizedAssetsFolder) return '';
+    if (p.startsWith(normalizedAssetsFolder + '/')) {
+      return p.slice(normalizedAssetsFolder.length + 1);
+    }
+
+    return p;
+  }
+
+  private normalizeTarget(target: string): string {
+    if (!target) return '';
+    let t = target.trim().replace(/\\/g, '/');
+    t = t.replace(/^\.\/+/, '');
+    t = t.replace(/^\/+/, '');
+    return t;
+  }
+
+  private buildLookupIndex(files: TFile[]): AssetLookupIndex {
+    const byPathSuffix = new Map<string, TFile[]>();
+    const byName = new Map<string, TFile[]>();
+
+    for (const file of files) {
+      this.addToIndex(byName, file.name, file);
+
+      const normalizedPath = this.normalizeTarget(file.path);
+      const segments = normalizedPath.split('/');
+
+      for (let index = 0; index < segments.length; index++) {
+        this.addToIndex(byPathSuffix, segments.slice(index).join('/'), file);
+      }
+    }
+
+    return { byPathSuffix, byName };
+  }
+
+  private addToIndex(index: Map<string, TFile[]>, key: string, file: TFile): void {
+    const files = index.get(key);
+    if (files) {
+      files.push(file);
+      return;
+    }
+
+    index.set(key, [file]);
+  }
+
+  private findIndexedFile(
+    lookupIndex: AssetLookupIndex,
+    normalizedTarget: string,
+    baseName: string,
+    predicate?: (file: TFile) => boolean
+  ): TFile | undefined {
+    const seenPaths = new Set<string>();
+    const candidateGroups = [
+      lookupIndex.byPathSuffix.get(normalizedTarget),
+      lookupIndex.byName.get(baseName),
+    ];
+
+    for (const candidates of candidateGroups) {
+      for (const candidate of candidates ?? []) {
+        if (seenPaths.has(candidate.path)) {
+          continue;
+        }
+
+        seenPaths.add(candidate.path);
+        if (!predicate || predicate(candidate)) {
+          return candidate;
+        }
+      }
+    }
+
+    return undefined;
+  }
+}
