@@ -1,0 +1,1547 @@
+const mockLogger = () =>
+  ({
+    child: jest.fn().mockReturnThis(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  }) as any;
+
+const responseOk = (text: string) => ({
+  isError: false,
+  text,
+});
+
+const COMPLETED_JOB_JSON =
+  '{"jobId":"job-1","sessionId":"s1","status":"completed","progress":100,' +
+  '"result":{"promotionStats":{"notesPublished":2,"notesDeduplicated":0,"notesDeleted":0,' +
+  '"assetsPublished":0,"assetsDeduplicated":0}}}';
+
+const acceptedFinalizationJob = () => ({
+  status: 202,
+  headers: {},
+  text: JSON.stringify({ sessionId: 's1', jobId: 'job-1', status: 'queued' }),
+});
+
+const completedFinalizationJob = () => ({
+  status: 200,
+  headers: {},
+  text: COMPLETED_JOB_JSON,
+});
+
+const queuedJobResponse = () => responseOk('{"sessionId":"s1","jobId":"job-1","status":"queued"}');
+
+const completedJobResponse = () => responseOk(COMPLETED_JOB_JSON);
+
+/**
+ * Reads back the interval the finalization loop announced after each
+ * backpressure signal. The loop logs `nextPollInMs` precisely so its pacing is
+ * observable, which lets a test assert how the client behaves under 429 rather
+ * than merely that it eventually succeeds.
+ */
+const announcedPollDelays = (logger: { warn: jest.Mock }): number[] =>
+  logger.warn.mock.calls
+    .map(([, meta]) => (meta as { nextPollInMs?: number } | undefined)?.nextPollInMs)
+    .filter((value): value is number => typeof value === 'number');
+
+type MockEventSourceListener = (event?: { data?: string }) => void;
+
+class MockEventSource {
+  static instances: MockEventSource[] = [];
+
+  static reset(): void {
+    MockEventSource.instances = [];
+  }
+
+  readonly addEventListener = jest.fn((type: string, listener: MockEventSourceListener) => {
+    const listeners = this.listeners.get(type) ?? new Set<MockEventSourceListener>();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  });
+
+  readonly removeEventListener = jest.fn((type: string, listener: MockEventSourceListener) => {
+    this.listeners.get(type)?.delete(listener);
+  });
+
+  readonly close = jest.fn(() => {
+    this.closed = true;
+  });
+
+  private readonly listeners = new Map<string, Set<MockEventSourceListener>>();
+  private closed = false;
+
+  constructor(readonly url: string) {
+    MockEventSource.instances.push(this);
+  }
+
+  emit(type: string, event?: { data?: string }): void {
+    if (this.closed) {
+      return;
+    }
+
+    for (const listener of this.listeners.get(type) ?? []) {
+      listener(event);
+    }
+  }
+
+  emitJson(type: string, payload: unknown): void {
+    this.emit(type, { data: JSON.stringify(payload) });
+  }
+}
+
+const originalEventSource = (globalThis as { EventSource?: unknown }).EventSource;
+
+function installMockEventSource(): typeof MockEventSource {
+  (globalThis as { EventSource?: unknown }).EventSource = MockEventSource as unknown;
+  return MockEventSource;
+}
+
+function restoreEventSource(): void {
+  if (originalEventSource === undefined) {
+    delete (globalThis as { EventSource?: unknown }).EventSource;
+    return;
+  }
+
+  (globalThis as { EventSource?: unknown }).EventSource = originalEventSource;
+}
+
+async function getCreatedEventSource(): Promise<MockEventSource> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const eventSource = MockEventSource.instances[0];
+    if (eventSource) {
+      return eventSource;
+    }
+  }
+
+  throw new Error('Expected EventSource instance to be created');
+}
+
+async function getCreatedEventSourceWithFakeTimers(): Promise<MockEventSource> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await Promise.resolve();
+    await jest.advanceTimersByTimeAsync(0);
+
+    const eventSource = MockEventSource.instances[0];
+    if (eventSource) {
+      return eventSource;
+    }
+  }
+
+  throw new Error('Expected EventSource instance to be created');
+}
+
+describe('SessionApiClient', () => {
+  afterEach(() => {
+    restoreEventSource();
+    MockEventSource.reset();
+    jest.useRealTimers();
+    jest.resetModules();
+    jest.resetAllMocks();
+  });
+
+  it('uses the strictest request size limit between client and server', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({
+      status: 200,
+      headers: {},
+      text: JSON.stringify({ sessionId: 's1', maxBytesPerRequest: '1mb' }),
+    });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValue(responseOk('{"sessionId":"s1","maxBytesPerRequest":"1mb"}')),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'very-secret-api-key', handler as any, mockLogger());
+    const res = await client.startSession({
+      notesPlanned: 1,
+      assetsPlanned: 0,
+      maxBytesPerRequest: 1024,
+    });
+
+    expect(res.sessionId).toBe('s1');
+    expect(res.maxBytesPerRequest).toBe(1024);
+  });
+
+  it('accepts a smaller server limit than the plugin requested', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({
+      status: 200,
+      headers: {},
+      text: JSON.stringify({ sessionId: 's1', maxBytesPerRequest: 512 }),
+    });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValue(responseOk('{"sessionId":"s1","maxBytesPerRequest":512}')),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+    const res = await client.startSession({
+      notesPlanned: 1,
+      assetsPlanned: 0,
+      maxBytesPerRequest: 1024,
+    });
+
+    expect(res.maxBytesPerRequest).toBe(512);
+  });
+
+  it('parses authoritative source note hashes keyed by vaultPath', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({
+      status: 200,
+      headers: {},
+      text: JSON.stringify({
+        sessionId: 's1',
+        maxBytesPerRequest: 1024,
+        existingSourceNoteHashesByVaultPath: {
+          'notes/a.md': 'hash-a',
+        },
+      }),
+    });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValue(
+          responseOk(
+            '{"sessionId":"s1","maxBytesPerRequest":1024,"existingSourceNoteHashesByVaultPath":{"notes/a.md":"hash-a"}}'
+          )
+        ),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+    const res = await client.startSession({
+      notesPlanned: 1,
+      assetsPlanned: 0,
+      maxBytesPerRequest: 1024,
+    });
+
+    expect(res.existingSourceNoteHashesByVaultPath).toEqual({
+      'notes/a.md': 'hash-a',
+    });
+  });
+
+  it('passes the deduplication flag when starting a session', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({
+      status: 200,
+      headers: {},
+      text: JSON.stringify({ sessionId: 's1', maxBytesPerRequest: 1024 }),
+    });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValue(responseOk('{"sessionId":"s1","maxBytesPerRequest":1024}')),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+    await client.startSession({
+      notesPlanned: 1,
+      assetsPlanned: 0,
+      maxBytesPerRequest: 1024,
+      deduplicationEnabled: false,
+    });
+
+    expect(requestUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining('"deduplicationEnabled":false'),
+      })
+    );
+  });
+
+  it('passes ignore rules when starting a session', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({
+      status: 200,
+      headers: {},
+      text: JSON.stringify({ sessionId: 's1', maxBytesPerRequest: 1024 }),
+    });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValue(responseOk('{"sessionId":"s1","maxBytesPerRequest":1024}')),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+    await client.startSession({
+      notesPlanned: 1,
+      assetsPlanned: 0,
+      maxBytesPerRequest: 1024,
+      ignoreRules: [{ property: 'publish', ignoreIf: false } as any],
+    });
+
+    expect(requestUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining('"ignoreRules":[{"property":"publish","ignoreIf":false}]'),
+      })
+    );
+  });
+
+  it('reads a server limit expressed as a string', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({ status: 200, headers: {}, text: '' });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValue(responseOk('{"sessionId":"s1","maxBytesPerRequest":"2mb"}')),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+    const res = await client.startSession({
+      notesPlanned: 1,
+      assetsPlanned: 0,
+      maxBytesPerRequest: 0,
+    });
+
+    // Sans borne côté client, la limite du serveur fait foi telle quelle.
+    expect(res.maxBytesPerRequest).toBe(2 * 1024 * 1024);
+  });
+
+  it('refuses a session response without a usable sessionId', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({ status: 200, headers: {}, text: '' });
+    const handler = {
+      handleResponseAsync: jest.fn().mockResolvedValue(responseOk('{"maxBytesPerRequest":1024}')),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+    const start = () =>
+      client.startSession({ notesPlanned: 1, assetsPlanned: 0, maxBytesPerRequest: 1024 });
+
+    await expect(start()).rejects.toThrow('startSession failed');
+    await expect(start()).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        message: expect.stringContaining('sessionId'),
+      }),
+    });
+  });
+
+  it('refuses a session response whose size limit cannot be read', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({ status: 200, headers: {}, text: '' });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValue(responseOk('{"sessionId":"s1","maxBytesPerRequest":"huge"}')),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+    const start = () =>
+      client.startSession({ notesPlanned: 1, assetsPlanned: 0, maxBytesPerRequest: 1024 });
+
+    await expect(start()).rejects.toThrow('startSession failed');
+    await expect(start()).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        message: expect.stringContaining('maxBytesPerRequest'),
+      }),
+    });
+  });
+
+  it('ignores a malformed optional field instead of failing the session', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({ status: 200, headers: {}, text: '' });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValue(
+          responseOk('{"sessionId":"s1","maxBytesPerRequest":1024,"existingAssetHashes":"nope"}')
+        ),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const logger = mockLogger();
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, logger);
+    const res = await client.startSession({
+      notesPlanned: 1,
+      assetsPlanned: 0,
+      maxBytesPerRequest: 1024,
+    });
+
+    expect(res.sessionId).toBe('s1');
+    expect(res.existingAssetHashes).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('existingAssetHashes'));
+  });
+
+  it('throws when uploadNotes fails', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({ status: 500, headers: {}, text: 'err' });
+    const handler = {
+      handleResponseAsync: jest.fn().mockResolvedValue({ isError: true, error: new Error('fail') }),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    // L'erreur remontée porte le message destiné à l'utilisateur ; l'erreur d'origine
+    // reste accessible en `cause`, ce qui préserve le diagnostic.
+    await expect(client.uploadNotes('s1', [])).rejects.toThrow('uploadNotes failed');
+    await expect(client.uploadNotes('s1', [])).rejects.toMatchObject({
+      cause: expect.objectContaining({ message: 'fail' }),
+    });
+  });
+
+  it('uses the correct abortSession endpoint', async () => {
+    const requestUrl = jest.fn().mockResolvedValue({ status: 200, headers: {}, text: '{}' });
+    const handler = {
+      handleResponseAsync: jest.fn().mockResolvedValue({ isError: false, text: '{}' }),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+    await client.abortSession('s42');
+
+    expect(requestUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'http://api/api/session/s42/abort', method: 'POST' })
+    );
+  });
+
+  it('polls finalization status until completion after finish is accepted', async () => {
+    const requestUrl = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        headers: {},
+        text: JSON.stringify({ sessionId: 's1', jobId: 'job-1', status: 'queued' }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'processing',
+          progress: 50,
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'completed',
+          progress: 100,
+          result: {
+            promotionStats: {
+              notesPublished: 1,
+              notesDeduplicated: 0,
+              notesDeleted: 0,
+              assetsPublished: 0,
+              assetsDeduplicated: 0,
+            },
+          },
+        }),
+      });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce({
+          isError: false,
+          text: '{"sessionId":"s1","jobId":"job-1","status":"queued"}',
+        })
+        .mockResolvedValueOnce({
+          isError: false,
+          text: '{"jobId":"job-1","sessionId":"s1","status":"processing","progress":50}',
+        })
+        .mockResolvedValueOnce({
+          isError: false,
+          text: '{"jobId":"job-1","sessionId":"s1","status":"completed","progress":100,"result":{"promotionStats":{"notesPublished":1,"notesDeduplicated":0,"notesDeleted":0,"assetsPublished":0,"assetsDeduplicated":0}}}',
+        }),
+    };
+    jest.doMock('obsidian', () => ({ requestUrl }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+    const result = await client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    expect(result.promotionStats?.notesPublished).toBe(1);
+    expect(requestUrl).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ url: 'http://api/api/session/s1/status', method: 'GET' })
+    );
+  });
+
+  it('keeps polling finalization status when status requests are temporarily throttled', async () => {
+    jest.useFakeTimers();
+
+    const requestUrlWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        headers: {},
+        text: JSON.stringify({ sessionId: 's1', jobId: 'job-1', status: 'queued' }),
+      })
+      .mockRejectedValueOnce(new Error('Server under load after 3 retries (429)'))
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'completed',
+          progress: 100,
+          result: {
+            promotionStats: {
+              notesPublished: 2,
+              notesDeduplicated: 0,
+              notesDeleted: 0,
+              assetsPublished: 0,
+              assetsDeduplicated: 0,
+            },
+          },
+        }),
+      });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce({
+          isError: false,
+          text: '{"sessionId":"s1","jobId":"job-1","status":"queued"}',
+        })
+        .mockResolvedValueOnce({
+          isError: false,
+          text: '{"jobId":"job-1","sessionId":"s1","status":"completed","progress":100,"result":{"promotionStats":{"notesPublished":2,"notesDeduplicated":0,"notesDeleted":0,"assetsPublished":0,"assetsDeduplicated":0}}}',
+        }),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result.promotionStats?.notesPublished).toBe(2);
+    expect(requestUrlWithRetry).toHaveBeenCalledTimes(3);
+  });
+
+  it('widens the poll interval on each consecutive backpressure signal, up to the ceiling', async () => {
+    jest.useFakeTimers();
+    const logger = mockLogger();
+
+    const backpressure = () => new Error('Server under load after 3 retries (429)');
+    const requestUrlWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce(acceptedFinalizationJob())
+      .mockRejectedValueOnce(backpressure())
+      .mockRejectedValueOnce(backpressure())
+      .mockRejectedValueOnce(backpressure())
+      .mockRejectedValueOnce(backpressure())
+      .mockRejectedValueOnce(backpressure())
+      .mockRejectedValueOnce(backpressure())
+      .mockResolvedValueOnce(completedFinalizationJob());
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(queuedJobResponse())
+        .mockResolvedValueOnce(completedJobResponse()),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({ requestUrlWithRetry }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, logger);
+
+    const resultPromise = client.finishSession('s1', { notesProcessed: 1, assetsProcessed: 0 });
+    await jest.runAllTimersAsync();
+    await resultPromise;
+
+    // Doubling from the 1500 ms nominal interval, then held at the 30 s ceiling.
+    // The previous code slept a flat 1500 ms on every 429, so it announced nothing
+    // and kept polling a server that was asking to be left alone. The last two
+    // values cover the ceiling itself: without it the sequence would carry on to
+    // 48000 and beyond.
+    expect(announcedPollDelays(logger)).toEqual([3000, 6000, 12000, 24000, 30000, 30000]);
+  });
+
+  it('returns to the nominal poll interval once the server answers again', async () => {
+    jest.useFakeTimers();
+    const logger = mockLogger();
+
+    const requestUrlWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce(acceptedFinalizationJob())
+      .mockRejectedValueOnce(new Error('Server under load after 3 retries (429)'))
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({ jobId: 'job-1', sessionId: 's1', status: 'running', progress: 40 }),
+      })
+      .mockRejectedValueOnce(new Error('Server under load after 3 retries (429)'))
+      .mockResolvedValueOnce(completedFinalizationJob());
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(queuedJobResponse())
+        .mockResolvedValueOnce({
+          isError: false,
+          text: '{"jobId":"job-1","sessionId":"s1","status":"running","progress":40}',
+        })
+        .mockResolvedValueOnce(completedJobResponse()),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({ requestUrlWithRetry }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, logger);
+
+    const resultPromise = client.finishSession('s1', { notesProcessed: 1, assetsProcessed: 0 });
+    await jest.runAllTimersAsync();
+    await resultPromise;
+
+    // The server answered normally between the two 429, so the escalation starts
+    // over from the nominal interval instead of carrying on: 3000 both times,
+    // not 3000 then 6000.
+    expect(announcedPollDelays(logger)).toEqual([3000, 3000]);
+  });
+
+  it('uses SSE finalization events when realtime metadata is returned', async () => {
+    installMockEventSource();
+
+    const requestUrlWithRetry = jest.fn().mockResolvedValueOnce({
+      status: 202,
+      headers: {},
+      text: JSON.stringify({
+        sessionId: 's1',
+        jobId: 'job-1',
+        status: 'queued',
+        realtime: {
+          transport: 'sse',
+          streamUrl: '/events/session/s1/finalization?jobId=job-1',
+          token: 'signed-token',
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+      }),
+    });
+    const handler = {
+      handleResponseAsync: jest.fn().mockResolvedValueOnce({
+        isError: false,
+        text: JSON.stringify({
+          sessionId: 's1',
+          jobId: 'job-1',
+          status: 'queued',
+          realtime: {
+            transport: 'sse',
+            streamUrl: '/events/session/s1/finalization?jobId=job-1',
+            token: 'signed-token',
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        }),
+      }),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    const eventSource = await getCreatedEventSource();
+    expect(eventSource.url).toBe(
+      'http://api/events/session/s1/finalization?jobId=job-1&token=signed-token'
+    );
+    expect(eventSource.url).not.toContain('x-api-key');
+    expect(eventSource.url).not.toContain('very-secret-api-key');
+
+    eventSource.emitJson('connected', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'pending',
+      progress: 0,
+    });
+    eventSource.emitJson('status', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'processing',
+      progress: 85,
+    });
+    eventSource.emit('heartbeat');
+    eventSource.emitJson('completed', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'completed',
+      progress: 100,
+      result: {
+        promotionStats: {
+          notesPublished: 3,
+          notesDeduplicated: 1,
+          notesDeleted: 0,
+          assetsPublished: 0,
+          assetsDeduplicated: 0,
+        },
+      },
+    });
+
+    await expect(resultPromise).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 3,
+        notesDeduplicated: 1,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+    expect(requestUrlWithRetry).toHaveBeenCalledTimes(1);
+    expect(eventSource.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards backend finalization phases from SSE updates', async () => {
+    installMockEventSource();
+
+    const requestUrlWithRetry = jest.fn().mockResolvedValueOnce({
+      status: 202,
+      headers: {},
+      text: JSON.stringify({
+        sessionId: 's1',
+        jobId: 'job-1',
+        status: 'queued',
+        realtime: {
+          transport: 'sse',
+          streamUrl: '/events/session/s1/finalization?jobId=job-1',
+          token: 'signed-token',
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+      }),
+    });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"sessionId":"s1","jobId":"job-1","status":"queued","realtime":{"transport":"sse","streamUrl":"/events/session/s1/finalization?jobId=job-1","token":"signed-token","expiresAt":"2099-01-01T00:00:00.000Z"}}'
+          )
+        ),
+    };
+    const onFinalizationUpdate = jest.fn();
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession(
+      's1',
+      {
+        notesProcessed: 1,
+        assetsProcessed: 0,
+      },
+      { onFinalizationUpdate }
+    );
+
+    const eventSource = await getCreatedEventSource();
+    eventSource.emitJson('connected', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'processing',
+      progress: 20,
+      phase: 'rebuilding_notes',
+    });
+    eventSource.emitJson('status', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'processing',
+      progress: 45,
+      phase: 'rendering_html',
+    });
+    eventSource.emitJson('completed', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'completed',
+      progress: 100,
+      phase: 'completed',
+      result: {
+        promotionStats: {
+          notesPublished: 3,
+          notesDeduplicated: 0,
+          notesDeleted: 0,
+          assetsPublished: 0,
+          assetsDeduplicated: 0,
+        },
+      },
+    });
+
+    await expect(resultPromise).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 3,
+        notesDeduplicated: 0,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+
+    expect(onFinalizationUpdate).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ phase: 'queued', progress: 0 })
+    );
+    expect(onFinalizationUpdate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ phase: 'rebuilding_notes', progress: 20 })
+    );
+    expect(onFinalizationUpdate).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ phase: 'rendering_html', progress: 45 })
+    );
+    expect(onFinalizationUpdate).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({ phase: 'completed', progress: 100 })
+    );
+  });
+
+  it('resolves the publish flow when SSE emits completed', async () => {
+    installMockEventSource();
+
+    const requestUrlWithRetry = jest.fn().mockResolvedValueOnce({
+      status: 202,
+      headers: {},
+      text: JSON.stringify({
+        sessionId: 's1',
+        jobId: 'job-1',
+        status: 'queued',
+        realtime: {
+          transport: 'sse',
+          streamUrl: '/events/session/s1/finalization?jobId=job-1',
+          token: 'signed-token',
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+      }),
+    });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"sessionId":"s1","jobId":"job-1","status":"queued","realtime":{"transport":"sse","streamUrl":"/events/session/s1/finalization?jobId=job-1","token":"signed-token","expiresAt":"2099-01-01T00:00:00.000Z"}}'
+          )
+        ),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    const eventSource = await getCreatedEventSource();
+    eventSource.emitJson('completed', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'completed',
+      progress: 100,
+      result: {
+        promotionStats: {
+          notesPublished: 5,
+          notesDeduplicated: 0,
+          notesDeleted: 0,
+          assetsPublished: 0,
+          assetsDeduplicated: 0,
+        },
+      },
+    });
+
+    await expect(resultPromise).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 5,
+        notesDeduplicated: 0,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+  });
+
+  it('rejects when SSE emits failed', async () => {
+    installMockEventSource();
+
+    const requestUrlWithRetry = jest.fn().mockResolvedValueOnce({
+      status: 202,
+      headers: {},
+      text: JSON.stringify({
+        sessionId: 's1',
+        jobId: 'job-1',
+        status: 'queued',
+        realtime: {
+          transport: 'sse',
+          streamUrl: '/events/session/s1/finalization?jobId=job-1',
+          token: 'signed-token',
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+      }),
+    });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"sessionId":"s1","jobId":"job-1","status":"queued","realtime":{"transport":"sse","streamUrl":"/events/session/s1/finalization?jobId=job-1","token":"signed-token","expiresAt":"2099-01-01T00:00:00.000Z"}}'
+          )
+        ),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    const eventSource = await getCreatedEventSource();
+    eventSource.emitJson('failed', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'failed',
+      progress: 100,
+      error: 'finalization exploded',
+    });
+
+    await expect(resultPromise).rejects.toThrow('finalization exploded');
+    expect(requestUrlWithRetry).toHaveBeenCalledTimes(1);
+    expect(eventSource.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to polling when SSE connection errors before terminal state', async () => {
+    installMockEventSource();
+
+    const requestUrlWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        headers: {},
+        text: JSON.stringify({
+          sessionId: 's1',
+          jobId: 'job-1',
+          status: 'queued',
+          realtime: {
+            transport: 'sse',
+            streamUrl: '/events/session/s1/finalization?jobId=job-1',
+            token: 'signed-token',
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'completed',
+          progress: 100,
+          result: {
+            promotionStats: {
+              notesPublished: 7,
+              notesDeduplicated: 0,
+              notesDeleted: 0,
+              assetsPublished: 0,
+              assetsDeduplicated: 0,
+            },
+          },
+        }),
+      });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"sessionId":"s1","jobId":"job-1","status":"queued","realtime":{"transport":"sse","streamUrl":"/events/session/s1/finalization?jobId=job-1","token":"signed-token","expiresAt":"2099-01-01T00:00:00.000Z"}}'
+          )
+        )
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"jobId":"job-1","sessionId":"s1","status":"completed","progress":100,"result":{"promotionStats":{"notesPublished":7,"notesDeduplicated":0,"notesDeleted":0,"assetsPublished":0,"assetsDeduplicated":0}}}'
+          )
+        ),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    const eventSource = await getCreatedEventSource();
+    eventSource.emit('error');
+
+    await expect(resultPromise).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 7,
+        notesDeduplicated: 0,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+    expect(requestUrlWithRetry).toHaveBeenCalledTimes(2);
+    expect(eventSource.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to polling when SSE disconnects after the stream was connected', async () => {
+    installMockEventSource();
+
+    const requestUrlWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        headers: {},
+        text: JSON.stringify({
+          sessionId: 's1',
+          jobId: 'job-1',
+          status: 'queued',
+          realtime: {
+            transport: 'sse',
+            streamUrl: '/events/session/s1/finalization?jobId=job-1',
+            token: 'signed-token',
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'completed',
+          progress: 100,
+          result: {
+            promotionStats: {
+              notesPublished: 9,
+              notesDeduplicated: 0,
+              notesDeleted: 0,
+              assetsPublished: 0,
+              assetsDeduplicated: 0,
+            },
+          },
+        }),
+      });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"sessionId":"s1","jobId":"job-1","status":"queued","realtime":{"transport":"sse","streamUrl":"/events/session/s1/finalization?jobId=job-1","token":"signed-token","expiresAt":"2099-01-01T00:00:00.000Z"}}'
+          )
+        )
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"jobId":"job-1","sessionId":"s1","status":"completed","progress":100,"result":{"promotionStats":{"notesPublished":9,"notesDeduplicated":0,"notesDeleted":0,"assetsPublished":0,"assetsDeduplicated":0}}}'
+          )
+        ),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    const eventSource = await getCreatedEventSource();
+    eventSource.emitJson('connected', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'processing',
+      progress: 20,
+    });
+    eventSource.emitJson('status', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'processing',
+      progress: 60,
+    });
+    eventSource.emit('error');
+
+    await expect(resultPromise).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 9,
+        notesDeduplicated: 0,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+    expect(requestUrlWithRetry).toHaveBeenCalledTimes(2);
+    expect(eventSource.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to polling when SSE emits malformed payloads', async () => {
+    installMockEventSource();
+
+    const requestUrlWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        headers: {},
+        text: JSON.stringify({
+          sessionId: 's1',
+          jobId: 'job-1',
+          status: 'queued',
+          realtime: {
+            transport: 'sse',
+            streamUrl: '/events/session/s1/finalization?jobId=job-1',
+            token: 'signed-token',
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'completed',
+          progress: 100,
+          result: {
+            promotionStats: {
+              notesPublished: 10,
+              notesDeduplicated: 0,
+              notesDeleted: 0,
+              assetsPublished: 0,
+              assetsDeduplicated: 0,
+            },
+          },
+        }),
+      });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"sessionId":"s1","jobId":"job-1","status":"queued","realtime":{"transport":"sse","streamUrl":"/events/session/s1/finalization?jobId=job-1","token":"signed-token","expiresAt":"2099-01-01T00:00:00.000Z"}}'
+          )
+        )
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"jobId":"job-1","sessionId":"s1","status":"completed","progress":100,"result":{"promotionStats":{"notesPublished":10,"notesDeduplicated":0,"notesDeleted":0,"assetsPublished":0,"assetsDeduplicated":0}}}'
+          )
+        ),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    const eventSource = await getCreatedEventSource();
+    eventSource.emitJson('connected', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'processing',
+      progress: 10,
+    });
+    eventSource.emit('status', { data: '{bad-json' });
+
+    await expect(resultPromise).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 10,
+        notesDeduplicated: 0,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+    expect(requestUrlWithRetry).toHaveBeenCalledTimes(2);
+    expect(eventSource.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to polling when SSE stalls without a terminal event', async () => {
+    jest.useFakeTimers();
+    installMockEventSource();
+
+    const requestUrlWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        headers: {},
+        text: JSON.stringify({
+          sessionId: 's1',
+          jobId: 'job-1',
+          status: 'queued',
+          realtime: {
+            transport: 'sse',
+            streamUrl: '/events/session/s1/finalization?jobId=job-1',
+            token: 'signed-token',
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'completed',
+          progress: 100,
+          result: {
+            promotionStats: {
+              notesPublished: 12,
+              notesDeduplicated: 0,
+              notesDeleted: 0,
+              assetsPublished: 0,
+              assetsDeduplicated: 0,
+            },
+          },
+        }),
+      });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"sessionId":"s1","jobId":"job-1","status":"queued","realtime":{"transport":"sse","streamUrl":"/events/session/s1/finalization?jobId=job-1","token":"signed-token","expiresAt":"2099-01-01T00:00:00.000Z"}}'
+          )
+        )
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"jobId":"job-1","sessionId":"s1","status":"completed","progress":100,"result":{"promotionStats":{"notesPublished":12,"notesDeduplicated":0,"notesDeleted":0,"assetsPublished":0,"assetsDeduplicated":0}}}'
+          )
+        ),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    const eventSource = await getCreatedEventSourceWithFakeTimers();
+    eventSource.emitJson('connected', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'processing',
+      progress: 30,
+    });
+
+    await jest.advanceTimersByTimeAsync(45000);
+
+    await expect(resultPromise).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 12,
+        notesDeduplicated: 0,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+    expect(requestUrlWithRetry).toHaveBeenCalledTimes(2);
+    expect(eventSource.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses polling only when realtime metadata is absent', async () => {
+    const requestUrlWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        headers: {},
+        text: JSON.stringify({ sessionId: 's1', jobId: 'job-1', status: 'queued' }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'completed',
+          progress: 100,
+          result: {
+            promotionStats: {
+              notesPublished: 11,
+              notesDeduplicated: 0,
+              notesDeleted: 0,
+              assetsPublished: 0,
+              assetsDeduplicated: 0,
+            },
+          },
+        }),
+      });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(responseOk('{"sessionId":"s1","jobId":"job-1","status":"queued"}'))
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"jobId":"job-1","sessionId":"s1","status":"completed","progress":100,"result":{"promotionStats":{"notesPublished":11,"notesDeduplicated":0,"notesDeleted":0,"assetsPublished":0,"assetsDeduplicated":0}}}'
+          )
+        ),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    await expect(
+      client.finishSession('s1', {
+        notesProcessed: 1,
+        assetsProcessed: 0,
+      })
+    ).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 11,
+        notesDeduplicated: 0,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+
+    expect(MockEventSource.instances).toHaveLength(0);
+    expect(requestUrlWithRetry).toHaveBeenCalledTimes(2);
+  });
+
+  it('forwards backend phases through the polling fallback', async () => {
+    const requestUrlWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        headers: {},
+        text: JSON.stringify({ sessionId: 's1', jobId: 'job-1', status: 'queued' }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'processing',
+          progress: 85,
+          phase: 'rebuilding_indexes',
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        text: JSON.stringify({
+          jobId: 'job-1',
+          sessionId: 's1',
+          status: 'completed',
+          progress: 100,
+          phase: 'completed',
+          result: {
+            promotionStats: {
+              notesPublished: 11,
+              notesDeduplicated: 0,
+              notesDeleted: 0,
+              assetsPublished: 0,
+              assetsDeduplicated: 0,
+            },
+          },
+        }),
+      });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(responseOk('{"sessionId":"s1","jobId":"job-1","status":"queued"}'))
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"jobId":"job-1","sessionId":"s1","status":"processing","progress":85,"phase":"rebuilding_indexes"}'
+          )
+        )
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"jobId":"job-1","sessionId":"s1","status":"completed","progress":100,"phase":"completed","result":{"promotionStats":{"notesPublished":11,"notesDeduplicated":0,"notesDeleted":0,"assetsPublished":0,"assetsDeduplicated":0}}}'
+          )
+        ),
+    };
+    const onFinalizationUpdate = jest.fn();
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    await expect(
+      client.finishSession(
+        's1',
+        {
+          notesProcessed: 1,
+          assetsProcessed: 0,
+        },
+        { onFinalizationUpdate }
+      )
+    ).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 11,
+        notesDeduplicated: 0,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+
+    expect(onFinalizationUpdate).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ phase: 'queued', progress: 0 })
+    );
+    expect(onFinalizationUpdate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ phase: 'rebuilding_indexes', progress: 85 })
+    );
+    expect(onFinalizationUpdate).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ phase: 'completed', progress: 100 })
+    );
+  });
+
+  it('ignores duplicate terminal SSE events safely', async () => {
+    installMockEventSource();
+
+    const requestUrlWithRetry = jest.fn().mockResolvedValueOnce({
+      status: 202,
+      headers: {},
+      text: JSON.stringify({
+        sessionId: 's1',
+        jobId: 'job-1',
+        status: 'queued',
+        realtime: {
+          transport: 'sse',
+          streamUrl: '/events/session/s1/finalization?jobId=job-1',
+          token: 'signed-token',
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+      }),
+    });
+    const handler = {
+      handleResponseAsync: jest
+        .fn()
+        .mockResolvedValueOnce(
+          responseOk(
+            '{"sessionId":"s1","jobId":"job-1","status":"queued","realtime":{"transport":"sse","streamUrl":"/events/session/s1/finalization?jobId=job-1","token":"signed-token","expiresAt":"2099-01-01T00:00:00.000Z"}}'
+          )
+        ),
+    };
+
+    jest.doMock('obsidian', () => ({ requestUrl: jest.fn() }));
+    jest.doMock('../lib/utils/request-with-retry.util', () => ({
+      requestUrlWithRetry,
+    }));
+
+    const { SessionApiClient: Client } = await import('../lib/services/session-api.client');
+    const client = new Client('http://api', 'k', handler as any, mockLogger());
+
+    const resultPromise = client.finishSession('s1', {
+      notesProcessed: 1,
+      assetsProcessed: 0,
+    });
+
+    const eventSource = await getCreatedEventSource();
+    eventSource.emitJson('completed', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'completed',
+      progress: 100,
+      result: {
+        promotionStats: {
+          notesPublished: 13,
+          notesDeduplicated: 0,
+          notesDeleted: 0,
+          assetsPublished: 0,
+          assetsDeduplicated: 0,
+        },
+      },
+    });
+    eventSource.emitJson('failed', {
+      jobId: 'job-1',
+      sessionId: 's1',
+      status: 'failed',
+      progress: 100,
+      error: 'ignored',
+    });
+
+    await expect(resultPromise).resolves.toEqual({
+      promotionStats: {
+        notesPublished: 13,
+        notesDeduplicated: 0,
+        notesDeleted: 0,
+        assetsPublished: 0,
+        assetsDeduplicated: 0,
+      },
+    });
+    expect(eventSource.close).toHaveBeenCalledTimes(1);
+  });
+});
