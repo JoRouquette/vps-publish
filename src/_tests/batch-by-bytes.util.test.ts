@@ -1,0 +1,120 @@
+import { batchByBytes, batchByBytesAsync, jsonSizeBytes } from '../lib/utils/batch-by-bytes.util';
+
+const wrap = (batch: unknown[]) => ({ data: batch });
+
+describe('batchByBytes', () => {
+  it('groups items until limit is exceeded', () => {
+    const items = ['a', 'b', 'c', 'd'];
+    const sizeForTwo = jsonSizeBytes(wrap(items.slice(0, 2)));
+    const maxBytes = sizeForTwo + 1; // allows 2, not 3
+
+    const result = batchByBytes(items, maxBytes, wrap);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual(['a', 'b']);
+    expect(result[1]).toEqual(['c', 'd']);
+  });
+
+  it('does not split when everything fits', () => {
+    const items = ['note-1', 'note-2'];
+    const maxBytes = jsonSizeBytes(wrap(items)) + 10;
+
+    const result = batchByBytes(items, maxBytes, wrap);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(items);
+  });
+
+  it('throws error if maxBytes is invalid', () => {
+    expect(() => batchByBytes(['x'], 0, wrap)).toThrow('maxBytes must be > 0');
+  });
+
+  it('puts oversized item in its own batch (will be chunked)', () => {
+    const huge = 'x'.repeat(1024);
+    const small = 'y';
+    const maxBytes = 50; // Enough for small items only
+
+    const result = batchByBytes([small, huge, small], maxBytes, wrap);
+
+    // Large item is in its own batch, will be handled by chunked upload
+    expect(result.length).toBe(3);
+    expect(result[0]).toEqual([small]);
+    expect(result[1]).toEqual([huge]); // In its own batch
+    expect(result[2]).toEqual([small]);
+  });
+
+  it('handles multiple consecutive oversized items', () => {
+    const huge1 = 'x'.repeat(1024);
+    const huge2 = 'y'.repeat(1024);
+    const small = 'z';
+    const maxBytes = 50;
+
+    const result = batchByBytes([huge1, huge2, small], maxBytes, wrap);
+
+    // Each large item in its own batch
+    expect(result.length).toBe(3);
+    expect(result[0]).toEqual([huge1]);
+    expect(result[1]).toEqual([huge2]);
+    expect(result[2]).toEqual([small]);
+  });
+
+  it('keeps every produced wrapped batch within the byte limit', () => {
+    const items = [
+      { id: 'a', content: 'x'.repeat(20) },
+      { id: 'b', content: 'y'.repeat(60) },
+      { id: 'c', content: 'z'.repeat(15) },
+      { id: 'd', content: 'w'.repeat(40) },
+    ];
+    const maxBytes = jsonSizeBytes(wrap(items.slice(0, 2)));
+
+    const result = batchByBytes(items, maxBytes, wrap);
+
+    expect(result.every((batch) => jsonSizeBytes(wrap(batch)) <= maxBytes)).toBe(true);
+    expect(result.flat()).toEqual(items);
+  });
+});
+
+describe('batchByBytesAsync', () => {
+  it('produces same batches as sync version', async () => {
+    const items = ['a', 'b', 'c', 'd'];
+    const sizeForTwo = jsonSizeBytes(wrap(items.slice(0, 2)));
+    const maxBytes = sizeForTwo + 1;
+
+    const syncResult = batchByBytes(items, maxBytes, wrap);
+    const asyncResult = await batchByBytesAsync(items, maxBytes, wrap);
+
+    expect(asyncResult).toEqual(syncResult);
+  });
+
+  it('yields periodically with yieldEvery param', async () => {
+    const items = Array.from({ length: 100 }, (_, i) => `item-${i}`);
+    const maxBytes = jsonSizeBytes(wrap([items[0]])) * 10; // Fit 10 items per batch
+
+    let yielded = false;
+    jest.spyOn(global, 'setTimeout').mockImplementation((fn) => {
+      if (typeof fn === 'function') {
+        yielded = true;
+        fn();
+      }
+      return 0 as unknown as NodeJS.Timeout;
+    });
+
+    await batchByBytesAsync(items, maxBytes, wrap, 10); // Yield every 10 items
+
+    expect(yielded).toBe(true);
+    jest.restoreAllMocks();
+  });
+
+  it('handles oversized items correctly', async () => {
+    const huge = 'x'.repeat(1024);
+    const small = 'y';
+    const maxBytes = 50;
+
+    const result = await batchByBytesAsync([small, huge, small], maxBytes, wrap);
+
+    expect(result.length).toBe(3);
+    expect(result[0]).toEqual([small]);
+    expect(result[1]).toEqual([huge]);
+    expect(result[2]).toEqual([small]);
+  });
+});
